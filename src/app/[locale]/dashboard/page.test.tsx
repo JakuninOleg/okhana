@@ -14,6 +14,19 @@ vi.mock('@clerk/nextjs/server', () => ({
   }),
 }));
 
+// Mock locale-aware redirect from @/i18n/navigation.
+// The real module pulls in next-intl/navigation which doesn't resolve in the
+// vitest Node environment, so we stub it and capture calls.
+// next-intl's redirect throws internally (like Next.js redirect) to halt
+// rendering, so the mock throws too.
+const mockRedirect = vi.fn((arg: unknown) => {
+  void arg;
+  throw new Error('NEXT_REDIRECT');
+});
+vi.mock('@/i18n/navigation', () => ({
+  redirect: (arg: unknown) => mockRedirect(arg),
+}));
+
 // Mock next-intl/server translations
 vi.mock('next-intl/server', () => ({
   getTranslations: () =>
@@ -133,5 +146,20 @@ describe('Dashboard page', () => {
     const html = renderToString(result);
     expect(html).toContain('Sign out');
     expect(html).toContain('data-locale="ru"');
+  });
+
+  it('redirects to home page when user is not authenticated', async () => {
+    mockAuth.mockResolvedValue({ userId: null });
+
+    const { default: DashboardPage } = await import('./page');
+
+    // redirect() throws to halt rendering (mirrors next-intl behaviour),
+    // so the page rejects. We assert the redirect was invoked with the
+    // expected locale-aware target.
+    await expect(
+      DashboardPage({ params: Promise.resolve({ locale: 'en' }) }),
+    ).rejects.toThrow('NEXT_REDIRECT');
+
+    expect(mockRedirect).toHaveBeenCalledWith({ href: '/', locale: 'en' });
   });
 });
