@@ -5,6 +5,13 @@ import React from 'react';
 const mockAuth = vi.fn();
 vi.mock('@clerk/nextjs/server', () => ({
   auth: () => mockAuth(),
+  clerkClient: () => Promise.resolve({
+    users: {
+      getUser: vi.fn().mockResolvedValue({
+        emailAddresses: [{ emailAddress: 'fallback@example.com' }],
+      }),
+    },
+  }),
 }));
 
 // Mock next-intl/server translations
@@ -85,7 +92,7 @@ describe('Dashboard page', () => {
     expect(html).toContain('Hello, test@example.com');
   });
 
-  it('renders greeting with empty email when user not found in db', async () => {
+  it('falls back to Clerk API when user not found in db', async () => {
     mockAuth.mockResolvedValue({ userId: 'user_123' });
     mockDbSelect.mockResolvedValue([]);
 
@@ -96,8 +103,21 @@ describe('Dashboard page', () => {
     }) as React.ReactElement;
 
     const html = renderToString(result);
-    expect(html).toContain('Hello,');
-    expect(html).not.toContain('Hello, test@example.com');
+    expect(html).toContain('Hello, fallback@example.com');
+  });
+
+  it('falls back to Clerk API when db query fails', async () => {
+    mockAuth.mockResolvedValue({ userId: 'user_123' });
+    mockDbSelect.mockRejectedValue(new Error('Connection refused'));
+
+    const { default: DashboardPage } = await import('./page');
+
+    const result = await DashboardPage({
+      params: Promise.resolve({ locale: 'en' }),
+    }) as React.ReactElement;
+
+    const html = renderToString(result);
+    expect(html).toContain('Hello, fallback@example.com');
   });
 
   it('renders sign-out button with correct locale', async () => {
