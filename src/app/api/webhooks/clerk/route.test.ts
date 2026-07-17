@@ -6,7 +6,7 @@ const mockUpdateSet = vi.fn(() => ({ where: vi.fn() }));
 const mockDeleteWhere = vi.fn();
 
 vi.mock('svix', () => ({
-  Webhook: vi.fn().mockImplementation(function (this: any, secret: string) {
+  Webhook: vi.fn().mockImplementation(function (this: { verify: (body: string) => unknown }) {
     this.verify = (body: string) => JSON.parse(body);
   }),
 }));

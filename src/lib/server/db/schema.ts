@@ -1,6 +1,6 @@
 import {
   pgTable, serial, varchar, integer, timestamp,
-  boolean, text, jsonb, pgEnum, index, foreignKey, type AnyPgColumn
+  boolean, text, jsonb, pgEnum, index, type AnyPgColumn
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
