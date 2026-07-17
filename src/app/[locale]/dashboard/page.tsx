@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm';
 import { getTranslations } from 'next-intl/server';
 import { db } from '@/lib/server/db';
 import { users } from '@/lib/server/db/schema';
+import { redirect } from '@/i18n/navigation';
 import { SignOutButtonClient } from './SignOutButtonClient';
 
 // Force dynamic rendering — auth() requires request context from middleware.
@@ -14,6 +15,13 @@ export default async function DashboardPage({
   params: Promise<{ locale: string }>;
 }): Promise<React.JSX.Element> {
   const [{ locale }, { userId }] = await Promise.all([params, auth()]);
+
+  // Explicit auth guard — middleware protects routes, but defence-in-depth:
+  // redirect unauthenticated users to the home page instead of rendering
+  // the dashboard with an empty email.
+  if (!userId) {
+    redirect({ href: '/', locale });
+  }
 
   // Try to get email from Supabase (synced via Clerk webhook).
   // Fall back to Clerk API if the DB query fails or the user hasn't been

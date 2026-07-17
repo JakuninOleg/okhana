@@ -42,7 +42,44 @@ describe('proxy.ts config', () => {
     const { config } = await import('./proxy');
     const matchers = config.matcher as string[];
     // This regex silently fails to match /ru and /en in Turbopack
-    const brokenRegex = '/((?!api|_next|_vercel|.*\\..*).*)';
+    const brokenRegex = '/((?!api|_next|_vercel|.*\..*).*)';
     expect(matchers).not.toContain(brokenRegex);
+  });
+});
+
+/**
+ * clerkMiddleware handler must await auth.protect(). Without the await the
+ * middleware returns before protection is enforced, leaking protected routes
+ * to unauthenticated users. These tests exercise the handler directly.
+ */
+describe('proxy.ts handler', () => {
+  // The mock makes clerkMiddleware return the raw handler, so `default` is
+  // the (auth, req) function itself. Cast to a loose signature for testing.
+  type Handler = (auth: { protect: () => Promise<unknown> }, req: unknown) => Promise<unknown>;
+
+  it('awaits auth.protect() — rejects when protect rejects', async () => {
+    const { default: handler } = await import('./proxy');
+    const run = handler as unknown as Handler;
+
+    const protect = vi.fn().mockRejectedValue(new Error('protected'));
+    const auth = { protect };
+
+    // createRouteMatcher is mocked to return false → route is non-public →
+    // protect() is invoked. If it's properly awaited, the handler rejects.
+    await expect(run(auth, {})).rejects.toThrow('protected');
+    expect(protect).toHaveBeenCalledOnce();
+  });
+
+  it('returns intlMiddleware result when protect resolves', async () => {
+    const { default: handler } = await import('./proxy');
+    const run = handler as unknown as Handler;
+
+    const protect = vi.fn().mockResolvedValue(undefined);
+    const auth = { protect };
+
+    // protect resolves, so the handler should resolve to intlMiddleware's
+    // return value (mocked to null).
+    const result = await run(auth, {});
+    expect(result).toBeNull();
   });
 });
