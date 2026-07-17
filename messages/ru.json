@@ -1,1 +1,11 @@
-{}
+{
+  "Home": {
+    "signIn": "Войти"
+  },
+  "Dashboard": {
+    "greeting": "Привет, {email}",
+    "signOut": "Выйти"
+  }
+
+}
+
