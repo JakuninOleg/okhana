@@ -8,6 +8,7 @@ const isPublicRoute = createRouteMatcher([
   '/:locale',
   '/:locale/sign-in(.*)',
   '/:locale/sign-up(.*)',
+  '/api/webhooks/:path*',  // public — no auth required for server-to-server webhooks
 ]);
 
 export default clerkMiddleware(async (auth, req) => {
