@@ -5,9 +5,10 @@ import { routing } from '@/i18n/routing';
 import { notFound } from 'next/navigation';
 import "../globals.css";
 
-export function generateStaticParams() {
-  return routing.locales.map((locale) => ({ locale }));
-}
+// Note: generateStaticParams is intentionally omitted.
+// With Clerk auth(), pages need request context from the proxy/middleware.
+// generateStaticParams causes prerendering at build time, which bypasses
+// the proxy and makes auth() fail.
 
 export default async function LocaleLayout({
   children,
@@ -36,3 +37,4 @@ export default async function LocaleLayout({
     </ClerkProvider>
   );
 }
+
