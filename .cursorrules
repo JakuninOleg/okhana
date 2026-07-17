@@ -1,0 +1,77 @@
+# Okhana — Cursor AI Rules
+
+## Project Context
+
+Okhana is an AI-powered family hub. The core principle: **"AI is the architecture, not a feature."** Privacy filtering happens at the database query level, never in the LLM prompt.
+
+- **Type**: Full-stack web application (Next.js 16 App Router)
+- **Market**: International (EN primary, RU secondary)
+- **Repository**: github.com/JakuninOleg/okhana
+
+## Tech Stack (Never Deviate)
+
+| Layer | Technology |
+|---|---|
+| Framework | Next.js 16.2.10 (App Router) |
+| UI | React 19.2.4 |
+| Language | TypeScript 5 (strict mode) |
+| Styling | Tailwind CSS v4 + shadcn/ui |
+| Auth | Clerk |
+| i18n | next-intl 4.13.2 |
+| Database | Supabase PostgreSQL + Drizzle ORM |
+| AI | Vercel AI SDK |
+| Testing | Vitest |
+| CI/CD | GitHub Actions → Vercel |
+
+## Critical Rules
+
+### TypeScript
+- **Strict mode. No `any`.** Use proper types, generics, or `unknown` with type guards.
+- Explicit return types on exported functions.
+- No `// @ts-ignore` or `// @ts-expect-error` without a comment explaining why.
+
+### React / Next.js
+- **Server Components by default.** Only add `'use client'` when you need hooks, event handlers, or browser APIs.
+- Never import server-only code (database, secrets) into client components.
+- Use `next/link` or the `Link` from `@/i18n/navigation` for routing.
+
+### Internationalisation
+- **ALL user-facing strings must go through next-intl.** No hardcoded text in JSX.
+- Translation files live in `messages/[locale].json`.
+- Route config lives in `src/i18n/routing.ts`.
+
+### Styling
+- **Tailwind utilities only.** No inline `style={{}}`.
+- shadcn/ui components go in `src/components/ui/` only.
+- Use `cn()` from `src/lib/utils.ts` for conditional class merging.
+- Never modify `globals.css` unless adding a design token.
+
+### Database & Privacy
+- Schema lives in `src/lib/server/db/schema.ts`.
+- **Privacy filtering happens at the DB query level** — before any data reaches the AI model.
+- Never rely on prompt engineering for privacy. The model must never see data the user doesn't have access to.
+- All queries go through Drizzle ORM. No raw SQL strings.
+
+### Git
+- Branch naming: `feature/description`, `fix/description`, `docs/description`, `chore/description`.
+- Conventional commits: `feat:`, `fix:`, `chore:`, `refactor:`, `docs:`.
+- **Atomic commits**: one logical change per commit.
+- **Never commit to `master` directly.** Always use a branch + PR.
+- PR descriptions should reference the issue number.
+
+## Before Submitting
+
+- [ ] `npm run build` — zero TypeScript errors
+- [ ] `npm run test` — all tests green
+- [ ] `npm run lint` — zero warnings
+- [ ] Explain architectural decisions in code comments (WHY, not just WHAT)
+- [ ] Ask before adding new dependencies
+- [ ] Code changes are in small chunks (max 50 lines per diff)
+- [ ] No secrets or API keys in source files
+
+## Security
+
+- Secrets live in `.env.local` only. Never committed to git.
+- Client-side env vars must be prefixed with `NEXT_PUBLIC_` — and only when strictly necessary.
+- Never expose database connection strings, Clerk secret keys, or webhook secrets in client components.
+- Webhook endpoints verify signatures (Svix for Clerk) before processing.
