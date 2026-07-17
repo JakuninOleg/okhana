@@ -1,4 +1,5 @@
 import { Webhook } from 'svix';
+import type { WebhookEvent } from '@clerk/nextjs/server';
 import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/server/db';
@@ -27,21 +28,27 @@ export async function POST(req: Request) {
 
   // Verify webhook signature
   const wh = new Webhook(WEBHOOK_SECRET);
-  let evt: any;
+  let evt: WebhookEvent;
 
   try {
     evt = wh.verify(body, {
       'svix-id': svix_id,
       'svix-timestamp': svix_timestamp,
       'svix-signature': svix_signature,
-    });
-  } catch (err) {
+    }) as WebhookEvent;
+  } catch {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
   }
 
   // Extract user data from the verified event object (not raw JSON.parse)
-  const { id: clerkId, email_addresses, first_name, last_name, image_url } = evt.data;
-  const email = email_addresses?.[0]?.email_address;
+  const { id: clerkId, email_addresses, first_name, last_name, image_url } = evt.data as {
+    id: string;
+    email_addresses: { email_address: string }[];
+    first_name: string | null;
+    last_name: string | null;
+    image_url: string | null;
+  };
+  const email = email_addresses?.[0]?.email_address as string;
   const name = [first_name, last_name].filter(Boolean).join(' ') || email;
 
   // Handle Clerk events
