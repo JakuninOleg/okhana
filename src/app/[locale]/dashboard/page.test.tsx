@@ -5,13 +5,14 @@ import React from 'react';
 const mockAuth = vi.fn();
 vi.mock('@clerk/nextjs/server', () => ({
   auth: () => mockAuth(),
-  clerkClient: () => Promise.resolve({
-    users: {
-      getUser: vi.fn().mockResolvedValue({
-        emailAddresses: [{ emailAddress: 'fallback@example.com' }],
-      }),
-    },
-  }),
+}));
+
+// Mock ensureUserExists — the page now delegates user sync to this function
+// instead of calling clerkClient() inline. Each test configures the return
+// value (or rejection) to exercise a different code path.
+const mockEnsureUserExists = vi.fn();
+vi.mock('@/lib/server/db/queries/users', () => ({
+  ensureUserExists: (clerkUserId: string) => mockEnsureUserExists(clerkUserId),
 }));
 
 // Mock locale-aware redirect from @/i18n/navigation.
@@ -37,8 +38,9 @@ vi.mock('next-intl/server', () => ({
     }),
 }));
 
-// Mock db query — supports both the main query (select → from → leftJoin → where → limit)
-// and the members query (select → from → where).
+// Mock db query — supports both the main family-info query
+// (select → from → leftJoin → where → limit) and the members query
+// (select → from → where).
 const mockDbSelect = vi.fn();
 const mockMembersDbSelect = vi.fn();
 const mockWhere = vi.fn(() => ({
@@ -97,12 +99,20 @@ function renderToString(element: React.ReactElement): string {
 describe('Dashboard page', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Default happy path: ensureUserExists returns an email, no DB error.
+    mockEnsureUserExists.mockResolvedValue({
+      email: 'test@example.com',
+      name: 'Test User',
+      avatarUrl: null,
+    });
   });
 
-  it('renders greeting with user email from database', async () => {
+  it('renders greeting with email from ensureUserExists', async () => {
     mockAuth.mockResolvedValue({ userId: 'user_123' });
-    mockDbSelect
-      .mockResolvedValueOnce([{ email: 'test@example.com', familyId: null, familyName: null, inviteCode: null }]);
+    // Family-info query returns no family → setup form shown
+    mockDbSelect.mockResolvedValueOnce([
+      { familyId: null, familyName: null, inviteCode: null },
+    ]);
 
     const { default: DashboardPage } = await import('./page');
 
@@ -112,12 +122,12 @@ describe('Dashboard page', () => {
 
     const html = renderToString(result);
     expect(html).toContain('Hello, test@example.com');
+    expect(mockEnsureUserExists).toHaveBeenCalledWith('user_123');
   });
 
-  it('falls back to Clerk API when user not found in db', async () => {
+  it('shows the db error when ensureUserExists fails, without crashing', async () => {
     mockAuth.mockResolvedValue({ userId: 'user_123' });
-    mockDbSelect
-      .mockResolvedValueOnce([]);
+    mockEnsureUserExists.mockRejectedValueOnce(new Error('DB connection refused'));
 
     const { default: DashboardPage } = await import('./page');
 
@@ -126,30 +136,14 @@ describe('Dashboard page', () => {
     }) as React.ReactElement;
 
     const html = renderToString(result);
-    expect(html).toContain('Hello, fallback@example.com');
-  });
-
-  it('shows the db error message when the query fails, without falling back silently', async () => {
-    mockAuth.mockResolvedValue({ userId: 'user_123' });
-    mockDbSelect
-      .mockRejectedValueOnce(new Error('Connection refused'));
-
-    const { default: DashboardPage } = await import('./page');
-
-    const result = await DashboardPage({
-      params: Promise.resolve({ locale: 'en' }),
-    }) as React.ReactElement;
-
-    const html = renderToString(result);
-    // On DB failure the page surfaces the error instead of silently falling
-    // back — see src/app/[locale]/dashboard/page.tsx catch block.
-    expect(html).toContain('Connection refused');
+    expect(html).toContain('DB connection refused');
   });
 
   it('renders sign-out button with correct locale', async () => {
     mockAuth.mockResolvedValue({ userId: 'user_123' });
-    mockDbSelect
-      .mockResolvedValueOnce([{ email: 'test@example.com', familyId: null, familyName: null, inviteCode: null }]);
+    mockDbSelect.mockResolvedValueOnce([
+      { familyId: null, familyName: null, inviteCode: null },
+    ]);
 
     const { default: DashboardPage } = await import('./page');
 
@@ -175,6 +169,8 @@ describe('Dashboard page', () => {
     ).rejects.toThrow('NEXT_REDIRECT');
 
     expect(mockRedirect).toHaveBeenCalledWith({ href: '/', locale: 'en' });
+    // ensureUserExists must NOT be called for unauthenticated users
+    expect(mockEnsureUserExists).not.toHaveBeenCalled();
   });
 
   it('does not crash when the members query fails (defence-in-depth)', async () => {
@@ -183,7 +179,7 @@ describe('Dashboard page', () => {
     // a generic "An error occurred in the Server Components render".
     mockAuth.mockResolvedValue({ userId: 'user_123' });
     mockDbSelect.mockResolvedValueOnce([
-      { email: 'test@example.com', familyId: 7, familyName: 'Smiths', inviteCode: 'ABCD2345' },
+      { familyId: 7, familyName: 'Smiths', inviteCode: 'ABCD2345' },
     ]);
     mockMembersDbSelect.mockRejectedValueOnce(new Error('Connection lost'));
 

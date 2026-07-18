@@ -1,8 +1,9 @@
-import { auth, clerkClient } from '@clerk/nextjs/server';
+import { auth } from '@clerk/nextjs/server';
 import { eq } from 'drizzle-orm';
 import { getTranslations } from 'next-intl/server';
 import { db } from '@/lib/server/db';
 import { families, users } from '@/lib/server/db/schema';
+import { ensureUserExists } from '@/lib/server/db/queries/users';
 import { redirect } from '@/i18n/navigation';
 import { SignOutButtonClient } from './SignOutButtonClient';
 import { FamilySetupForm } from './family-setup-form';
@@ -25,61 +26,62 @@ export default async function DashboardPage({
     redirect({ href: '/', locale });
   }
 
-  // Try to get email and family info from Supabase (synced via Clerk webhook).
-  // Fall back to Clerk API if the DB query fails or the user hasn't been
-  // synced yet — this happens in local dev where Clerk webhooks can't
-  // reach localhost.
+  // After the guard above, userId is guaranteed non-null. redirect() throws
+  // to halt rendering, but TypeScript doesn't know that — use a non-null
+  // assertion so downstream calls (ensureUserExists, eq) type-check.
+  const clerkUserId = userId!;
+
+  // ROBUST user sync: ensure the user exists in Supabase BEFORE querying
+  // family data. The Clerk webhook may have failed (misconfigured endpoint,
+  // wrong secret, production instance not set up) — without this upsert the
+  // user would see a broken dashboard and could not create/join a family
+  // (foreign-key constraints fail). The webhook remains an optimisation;
+  // this is the critical path.
   let email = '';
+  let dbError: string | null = null;
+  try {
+    const ensured = await ensureUserExists(clerkUserId);
+    email = ensured.email;
+  } catch (e) {
+    // If even the upsert fails (DB down, Clerk API down), we still render
+    // the page — the user just sees an empty greeting. Family operations
+    // will surface their own errors.
+    dbError = e instanceof Error ? e.message : 'Failed to sync user';
+    console.error('Failed to ensure user exists:', e);
+  }
+
+  // Query family info from Supabase (now that the user row is guaranteed).
   let familyName: string | null = null;
   let familyId: number | null = null;
   let inviteCode: string | null = null;
   let hasFamily = false;
-  let dbError: string | null = null;
 
-  if (userId) {
+  if (!dbError) {
     try {
       const [result] = await db
         .select({
-          email: users.email,
           familyId: families.id,
           familyName: families.name,
           inviteCode: families.inviteCode,
         })
         .from(users)
         .leftJoin(families, eq(users.familyId, families.id))
-        .where(eq(users.clerkId, userId))
+        .where(eq(users.clerkId, clerkUserId))
         .limit(1);
 
-      email = result?.email ?? '';
       familyName = result?.familyName ?? null;
       familyId = result?.familyId ?? null;
       inviteCode = result?.inviteCode ?? null;
       hasFamily = familyName !== null;
     } catch (e) {
-      // DB query failed — likely a connection issue or the table hasn't
-      // been created yet. Store the error to display instead of silently
-      // showing the setup form, which would cause a confusing UX.
-      dbError = e instanceof Error ? e.message : 'Database connection failed';
-    }
-
-    if (!email && !dbError) {
-      try {
-        const client = await clerkClient();
-        const clerkUser = await client.users.getUser(userId);
-        email = clerkUser.emailAddresses[0]?.emailAddress ?? '';
-      } catch (e) {
-        // Clerk API failure (rate limit, network, etc.) — don't crash the
-        // page. The user will see an empty greeting, recoverable on reload.
-        console.error('Failed to fetch user from Clerk API:', e);
-      }
+      dbError = e instanceof Error ? e.message : 'Database query failed';
+      console.error('Failed to query family info:', e);
     }
   }
 
   // Fetch family members if the user belongs to a family.
-  // Wrapped in try-catch separately from the main query — a connection drop
-  // here must not crash the entire Server Component render. In production
-  // Next.js masks such errors as a generic "An error occurred in the Server
-  // Components render", which is opaque to the user.
+  // Wrapped in try-catch separately — a connection drop here must not crash
+  // the entire Server Component render.
   let members: { email: string; familyRole: string | null }[] = [];
   if (hasFamily && familyId) {
     try {
@@ -88,8 +90,6 @@ export default async function DashboardPage({
         .from(users)
         .where(eq(users.familyId, familyId));
     } catch (e) {
-      // Non-critical: show the family info without the members list rather
-      // than crashing the whole page.
       console.error('Failed to fetch family members:', e);
     }
   }
