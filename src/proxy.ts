@@ -1,21 +1,20 @@
-import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
+import { clerkMiddleware } from '@clerk/nextjs/server';
 import createMiddleware from 'next-intl/middleware';
 import { routing } from './i18n/routing';
 
 const intlMiddleware = createMiddleware(routing);
 
-const isPublicRoute = createRouteMatcher([
-  '/',
-  '/:locale',
-  '/:locale/sign-in(.*)',
-  '/:locale/sign-up(.*)',
-]);
-
-export default clerkMiddleware(async (auth, req) => {
-  if (!isPublicRoute(req)) {
-    await auth.protect();
-  }
-
+// Following Clerk's guidance after CVE-2026-41248: middleware-only route
+// gating via createRouteMatcher()/auth.protect() can be bypassed by crafted
+// requests that never reach the middleware's matcher. Route protection must
+// happen at the point where the resource is read/mutated (page, layout, API
+// route, Server Action) — not solely in middleware.
+//
+// clerkMiddleware() is kept here only so that auth() has request context
+// available in Server Components downstream. It no longer protects routes;
+// each protected page is responsible for its own explicit auth() check with
+// a redirect (see src/app/[locale]/dashboard/page.tsx for the pattern).
+export default clerkMiddleware((auth, req) => {
   return intlMiddleware(req);
 });
 

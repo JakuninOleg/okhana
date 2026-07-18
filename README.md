@@ -8,6 +8,8 @@
 ![Next.js](https://img.shields.io/badge/Next.js-16.2.10-000000?logo=next.js)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
+**Live**: [okhanahome.com](https://okhanahome.com)
+
 ---
 
 ## Problem
@@ -193,6 +195,19 @@ npm run dev
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk publishable key |
 | `CLERK_SECRET_KEY` | Clerk secret key |
 | `CLERK_WEBHOOK_SECRET` | Clerk webhook signing secret |
+
+### Clerk: Development vs Production Keys
+
+Clerk requires **two separate key pairs**, and they are not interchangeable:
+
+| Environment | Key prefix | Where it works |
+|---|---|---|
+| **Development** | `pk_test_` / `sk_test_` | `localhost` only — used for local dev |
+| **Production** | `pk_live_` / `sk_live_` | `okhanahome.com` only — enforces origin validation, requires HTTPS |
+
+Production keys **will not work on `localhost`** — Clerk validates the request origin against the configured production domain. Use development keys locally, and set the production keys as environment variables in the Vercel project settings (not in `.env.local`).
+
+The production instance is configured with a custom domain — **okhanahome.com** — purchased specifically to support Clerk's production requirements (Clerk needs a domain you control to add its verification/session DNS records; a `*.vercel.app` domain doesn't support this).
 
 ---
 

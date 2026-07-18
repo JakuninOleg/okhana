@@ -9,7 +9,6 @@ vi.mock('next-intl/middleware', () => ({
 
 vi.mock('@clerk/nextjs/server', () => ({
   clerkMiddleware: (handler: unknown) => handler,
-  createRouteMatcher: () => () => false,
 }));
 
 vi.mock('./i18n/routing', () => ({
@@ -48,38 +47,24 @@ describe('proxy.ts config', () => {
 });
 
 /**
- * clerkMiddleware handler must await auth.protect(). Without the await the
- * middleware returns before protection is enforced, leaking protected routes
- * to unauthenticated users. These tests exercise the handler directly.
+ * Following Clerk's guidance after CVE-2026-41248, proxy.ts no longer gates
+ * routes via createRouteMatcher()/auth.protect() — middleware-only
+ * protection can be bypassed by requests that never reach the matcher.
+ * clerkMiddleware() is retained solely to make auth() context available in
+ * Server Components; the handler must simply delegate to intlMiddleware
+ * without performing any auth checks itself. Route protection now lives in
+ * each protected page (see src/app/[locale]/dashboard/page.tsx).
  */
 describe('proxy.ts handler', () => {
-  // The mock makes clerkMiddleware return the raw handler, so `default` is
-  // the (auth, req) function itself. Cast to a loose signature for testing.
-  type Handler = (auth: { protect: () => Promise<unknown> }, req: unknown) => Promise<unknown>;
+  type Handler = (auth: unknown, req: unknown) => unknown;
 
-  it('awaits auth.protect() — rejects when protect rejects', async () => {
+  it('does not perform auth checks — delegates directly to intlMiddleware', async () => {
     const { default: handler } = await import('./proxy');
     const run = handler as unknown as Handler;
 
-    const protect = vi.fn().mockRejectedValue(new Error('protected'));
-    const auth = { protect };
-
-    // createRouteMatcher is mocked to return false → route is non-public →
-    // protect() is invoked. If it's properly awaited, the handler rejects.
-    await expect(run(auth, {})).rejects.toThrow('protected');
-    expect(protect).toHaveBeenCalledOnce();
-  });
-
-  it('returns intlMiddleware result when protect resolves', async () => {
-    const { default: handler } = await import('./proxy');
-    const run = handler as unknown as Handler;
-
-    const protect = vi.fn().mockResolvedValue(undefined);
-    const auth = { protect };
-
-    // protect resolves, so the handler should resolve to intlMiddleware's
-    // return value (mocked to null).
-    const result = await run(auth, {});
+    // No auth.protect() call is made; passing a bare object (no `protect`
+    // method) proves the handler never invokes it.
+    const result = run({}, {});
     expect(result).toBeNull();
   });
 });

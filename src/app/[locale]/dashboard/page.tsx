@@ -2,9 +2,11 @@ import { auth, clerkClient } from '@clerk/nextjs/server';
 import { eq } from 'drizzle-orm';
 import { getTranslations } from 'next-intl/server';
 import { db } from '@/lib/server/db';
-import { users } from '@/lib/server/db/schema';
+import { families, users } from '@/lib/server/db/schema';
 import { redirect } from '@/i18n/navigation';
 import { SignOutButtonClient } from './SignOutButtonClient';
+import { FamilySetupForm } from './family-setup-form';
+import { InviteCodeDisplay } from './invite-code-display';
 
 // Force dynamic rendering — auth() requires request context from middleware.
 export const dynamic = 'force-dynamic';
@@ -23,29 +25,57 @@ export default async function DashboardPage({
     redirect({ href: '/', locale });
   }
 
-  // Try to get email from Supabase (synced via Clerk webhook).
+  // Try to get email and family info from Supabase (synced via Clerk webhook).
   // Fall back to Clerk API if the DB query fails or the user hasn't been
   // synced yet — this happens in local dev where Clerk webhooks can't
   // reach localhost.
   let email = '';
+  let familyName: string | null = null;
+  let familyId: number | null = null;
+  let inviteCode: string | null = null;
+  let hasFamily = false;
+  let dbError: string | null = null;
+
   if (userId) {
     try {
-      const [user] = await db
-        .select({ email: users.email })
+      const [result] = await db
+        .select({
+          email: users.email,
+          familyId: families.id,
+          familyName: families.name,
+          inviteCode: families.inviteCode,
+        })
         .from(users)
+        .leftJoin(families, eq(users.familyId, families.id))
         .where(eq(users.clerkId, userId))
         .limit(1);
-      email = user?.email ?? '';
-    } catch {
-      // DB query failed (connection issue, table not synced, etc.)
-      // Fall back to Clerk API to get the user's email.
+
+      email = result?.email ?? '';
+      familyName = result?.familyName ?? null;
+      familyId = result?.familyId ?? null;
+      inviteCode = result?.inviteCode ?? null;
+      hasFamily = familyName !== null;
+    } catch (e) {
+      // DB query failed — likely a connection issue or the table hasn't
+      // been created yet. Store the error to display instead of silently
+      // showing the setup form, which would cause a confusing UX.
+      dbError = e instanceof Error ? e.message : 'Database connection failed';
     }
 
-    if (!email) {
+    if (!email && !dbError) {
       const client = await clerkClient();
       const clerkUser = await client.users.getUser(userId);
       email = clerkUser.emailAddresses[0]?.emailAddress ?? '';
     }
+  }
+
+  // Fetch family members if the user belongs to a family
+  let members: { email: string; familyRole: string | null }[] = [];
+  if (hasFamily && familyId) {
+    members = await db
+      .select({ email: users.email, familyRole: users.familyRole })
+      .from(users)
+      .where(eq(users.familyId, familyId));
   }
 
   const t = await getTranslations('Dashboard');
@@ -55,6 +85,30 @@ export default async function DashboardPage({
       <h1 className="text-3xl font-semibold tracking-tight">
         {t('greeting', { email })}
       </h1>
+
+      {dbError ? (
+        <p className="text-sm text-destructive">{dbError}</p>
+      ) : hasFamily ? (
+        <div className="w-full max-w-md space-y-4">
+          <p className="text-lg text-muted-foreground">
+            {t('familyInfo', { name: familyName! })}
+          </p>
+          <InviteCodeDisplay code={inviteCode!} />
+          <div className="space-y-2">
+            <h2 className="font-semibold">{t('members')}</h2>
+            <ul className="space-y-1">
+              {members.map((m) => (
+                <li key={m.email} className="text-sm text-muted-foreground">
+                  {m.email} — {m.familyRole}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      ) : (
+        <FamilySetupForm />
+      )}
+
       <SignOutButtonClient locale={locale} />
     </main>
   );

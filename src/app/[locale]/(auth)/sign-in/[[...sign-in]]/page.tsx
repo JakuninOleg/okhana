@@ -9,7 +9,10 @@ export default async function Page({
 
   return (
     <main className="flex min-h-screen items-center justify-center p-6">
-      <SignIn fallbackRedirectUrl={`/${locale}/dashboard`} />
+      <SignIn
+        fallbackRedirectUrl={`/${locale}/dashboard`}
+        forceRedirectUrl={`/${locale}/dashboard`}
+      />
     </main>
   );
 }
