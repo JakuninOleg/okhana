@@ -26,15 +26,25 @@ export default async function LocaleLayout({
   const messages = await getMessages();
   
   return (
-    <ClerkProvider>
-      <html lang={locale}>
-        <body>
+    <html lang={locale}>
+      <body>
+        <ClerkProvider
+          appearance={{
+            variables: {
+              colorPrimary: 'var(--primary)',
+              colorText: 'var(--foreground)',
+              colorBackground: 'var(--background)',
+              colorInputBackground: 'var(--background)',
+              borderRadius: 'var(--radius)',
+            } as Record<string, string>,
+          }}
+        >
           <NextIntlClientProvider messages={messages}>
             {children}
           </NextIntlClientProvider>
-        </body>
-      </html>
-    </ClerkProvider>
+        </ClerkProvider>
+      </body>
+    </html>
   );
 }
 
