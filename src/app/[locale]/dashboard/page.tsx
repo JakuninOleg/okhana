@@ -63,19 +63,35 @@ export default async function DashboardPage({
     }
 
     if (!email && !dbError) {
-      const client = await clerkClient();
-      const clerkUser = await client.users.getUser(userId);
-      email = clerkUser.emailAddresses[0]?.emailAddress ?? '';
+      try {
+        const client = await clerkClient();
+        const clerkUser = await client.users.getUser(userId);
+        email = clerkUser.emailAddresses[0]?.emailAddress ?? '';
+      } catch (e) {
+        // Clerk API failure (rate limit, network, etc.) — don't crash the
+        // page. The user will see an empty greeting, recoverable on reload.
+        console.error('Failed to fetch user from Clerk API:', e);
+      }
     }
   }
 
-  // Fetch family members if the user belongs to a family
+  // Fetch family members if the user belongs to a family.
+  // Wrapped in try-catch separately from the main query — a connection drop
+  // here must not crash the entire Server Component render. In production
+  // Next.js masks such errors as a generic "An error occurred in the Server
+  // Components render", which is opaque to the user.
   let members: { email: string; familyRole: string | null }[] = [];
   if (hasFamily && familyId) {
-    members = await db
-      .select({ email: users.email, familyRole: users.familyRole })
-      .from(users)
-      .where(eq(users.familyId, familyId));
+    try {
+      members = await db
+        .select({ email: users.email, familyRole: users.familyRole })
+        .from(users)
+        .where(eq(users.familyId, familyId));
+    } catch (e) {
+      // Non-critical: show the family info without the members list rather
+      // than crashing the whole page.
+      console.error('Failed to fetch family members:', e);
+    }
   }
 
   const t = await getTranslations('Dashboard');

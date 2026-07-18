@@ -176,4 +176,28 @@ describe('Dashboard page', () => {
 
     expect(mockRedirect).toHaveBeenCalledWith({ href: '/', locale: 'en' });
   });
+
+  it('does not crash when the members query fails (defence-in-depth)', async () => {
+    // Regression: the members select was unguarded — a connection drop there
+    // crashed the entire Server Component render in production, surfacing as
+    // a generic "An error occurred in the Server Components render".
+    mockAuth.mockResolvedValue({ userId: 'user_123' });
+    mockDbSelect.mockResolvedValueOnce([
+      { email: 'test@example.com', familyId: 7, familyName: 'Smiths', inviteCode: 'ABCD2345' },
+    ]);
+    mockMembersDbSelect.mockRejectedValueOnce(new Error('Connection lost'));
+
+    const { default: DashboardPage } = await import('./page');
+
+    // Should resolve, not reject — the error is caught and logged.
+    const result = await DashboardPage({
+      params: Promise.resolve({ locale: 'en' }),
+    }) as React.ReactElement;
+
+    const html = renderToString(result);
+    // Family info block renders (invite code shown) — the members query
+    // failure was caught and did not crash the page.
+    expect(html).toContain('ABCD2345');
+    expect(html).toContain('familyInfo');
+  });
 });
