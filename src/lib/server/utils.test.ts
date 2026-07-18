@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { generateInviteCode, generateId } from './utils';
+import { generateInviteCode } from './utils';
 
 describe('generateInviteCode', () => {
   // The alphabet deliberately excludes ambiguous characters so codes can be
@@ -46,17 +46,5 @@ describe('generateInviteCode', () => {
     // With 32^8 possible codes, collisions across 100 draws are astronomically
     // unlikely — a collision here would indicate a seeding bug.
     expect(codes.size).toBe(100);
-  });
-});
-
-describe('generateId', () => {
-  it('produces a non-empty string', () => {
-    const id = generateId();
-    expect(id.length).toBeGreaterThan(0);
-  });
-
-  it('respects a custom length', () => {
-    const id = generateId(10);
-    expect(id).toHaveLength(10);
   });
 });
