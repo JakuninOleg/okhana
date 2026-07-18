@@ -4,7 +4,9 @@
   },
   "Dashboard": {
     "greeting": "Привет, {email}",
-    "signOut": "Выйти"
+    "signOut": "Выйти",
+    "familyInfo": "Ваша семья: {name}",
+    "members": "Участники семьи"
   }
 
 }

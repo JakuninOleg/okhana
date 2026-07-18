@@ -37,22 +37,30 @@ vi.mock('next-intl/server', () => ({
     }),
 }));
 
-// Mock db query
+// Mock db query — supports both the main query (select → from → leftJoin → where → limit)
+// and the members query (select → from → where).
 const mockDbSelect = vi.fn();
+const mockMembersDbSelect = vi.fn();
+const mockWhere = vi.fn(() => ({
+  limit: vi.fn(() => mockDbSelect()),
+}));
+const mockMembersWhere = vi.fn(() => mockMembersDbSelect());
 vi.mock('@/lib/server/db', () => ({
   db: {
     select: vi.fn(() => ({
       from: vi.fn(() => ({
-        where: vi.fn(() => ({
-          limit: vi.fn(() => mockDbSelect()),
+        leftJoin: vi.fn(() => ({
+          where: mockWhere,
         })),
+        where: mockMembersWhere,
       })),
     })),
   },
 }));
 
 vi.mock('@/lib/server/db/schema', () => ({
-  users: { email: 'email', clerkId: 'clerk_id' },
+  users: { email: 'email', clerkId: 'clerk_id', familyId: 'family_id', familyRole: 'family_role' },
+  families: { id: 'id', name: 'name', inviteCode: 'invite_code' },
 }));
 
 vi.mock('drizzle-orm', () => ({
@@ -93,7 +101,8 @@ describe('Dashboard page', () => {
 
   it('renders greeting with user email from database', async () => {
     mockAuth.mockResolvedValue({ userId: 'user_123' });
-    mockDbSelect.mockResolvedValue([{ email: 'test@example.com' }]);
+    mockDbSelect
+      .mockResolvedValueOnce([{ email: 'test@example.com', familyId: null, familyName: null, inviteCode: null }]);
 
     const { default: DashboardPage } = await import('./page');
 
@@ -107,7 +116,8 @@ describe('Dashboard page', () => {
 
   it('falls back to Clerk API when user not found in db', async () => {
     mockAuth.mockResolvedValue({ userId: 'user_123' });
-    mockDbSelect.mockResolvedValue([]);
+    mockDbSelect
+      .mockResolvedValueOnce([]);
 
     const { default: DashboardPage } = await import('./page');
 
@@ -119,9 +129,10 @@ describe('Dashboard page', () => {
     expect(html).toContain('Hello, fallback@example.com');
   });
 
-  it('falls back to Clerk API when db query fails', async () => {
+  it('shows the db error message when the query fails, without falling back silently', async () => {
     mockAuth.mockResolvedValue({ userId: 'user_123' });
-    mockDbSelect.mockRejectedValue(new Error('Connection refused'));
+    mockDbSelect
+      .mockRejectedValueOnce(new Error('Connection refused'));
 
     const { default: DashboardPage } = await import('./page');
 
@@ -130,12 +141,15 @@ describe('Dashboard page', () => {
     }) as React.ReactElement;
 
     const html = renderToString(result);
-    expect(html).toContain('Hello, fallback@example.com');
+    // On DB failure the page surfaces the error instead of silently falling
+    // back — see src/app/[locale]/dashboard/page.tsx catch block.
+    expect(html).toContain('Connection refused');
   });
 
   it('renders sign-out button with correct locale', async () => {
     mockAuth.mockResolvedValue({ userId: 'user_123' });
-    mockDbSelect.mockResolvedValue([{ email: 'test@example.com' }]);
+    mockDbSelect
+      .mockResolvedValueOnce([{ email: 'test@example.com', familyId: null, familyName: null, inviteCode: null }]);
 
     const { default: DashboardPage } = await import('./page');
 

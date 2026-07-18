@@ -4,7 +4,9 @@
   },
   "Dashboard": {
     "greeting": "Hello, {email}",
-    "signOut": "Sign out"
+    "signOut": "Sign out",
+    "familyInfo": "Your family: {name}",
+    "members": "Family members"
   }
 
 }
