@@ -16,6 +16,17 @@ const intlMiddleware = createMiddleware(routing);
 // a redirect (see src/app/[locale]/dashboard/page.tsx for the pattern).
 export default clerkMiddleware((auth, req) => {
   return intlMiddleware(req);
+}, {
+  // Production is served both as okhanahome.com and www.okhanahome.com.
+  // authorizedParties prevents subdomain cookie-leaking attacks (CSRF) and
+  // must include every origin the app is reachable from — otherwise Clerk
+  // rejects the session token and redirects to sign-in in a loop ("Unsafe
+  // attempt to load URL ... from frame" console error).
+  authorizedParties: [
+    'https://okhanahome.com',
+    'https://www.okhanahome.com',
+    'http://localhost:3000',
+  ],
 });
 
 export const config = {
