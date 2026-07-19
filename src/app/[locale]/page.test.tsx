@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock auth() — returns userId or null depending on test scenario
-const mockAuth = vi.fn();
+const mockAuth = vi.hoisted(() => vi.fn());
 vi.mock('@clerk/nextjs/server', () => ({
   auth: () => mockAuth(),
 }));
@@ -18,7 +18,7 @@ vi.mock('next-intl/server', () => ({
 }));
 
 // Mock redirect from i18n/navigation — capture calls instead of actually redirecting
-const mockRedirect = vi.fn();
+const mockRedirect = vi.hoisted(() => vi.fn());
 vi.mock('@/i18n/navigation', () => ({
   redirect: (...args: unknown[]) => mockRedirect(...args),
   Link: ({ children, href, className }: { children: React.ReactNode; href: string; className?: string }) =>
@@ -26,7 +26,7 @@ vi.mock('@/i18n/navigation', () => ({
 }));
 
 // Mock db query — returns user email or empty array
-const mockDbSelect = vi.fn();
+const mockDbSelect = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/server/db', () => ({
   db: {
     select: vi.fn(() => ({
