@@ -4,6 +4,16 @@ import { routing } from './i18n/routing';
 
 const intlMiddleware = createMiddleware(routing);
 
+const vercelUrl = process.env.VERCEL_URL;
+
+const authorizedParties = [
+  'https://okhanahome.com',
+  'https://www.okhanahome.com',
+  'http://localhost:3000',
+  'https://okhana-git-staging-jakunin-olegs-projects.vercel.app',
+  ...(vercelUrl ? [`https://${vercelUrl}`] : []),
+];
+
 // Following Clerk's guidance after CVE-2026-41248: middleware-only route
 // gating via createRouteMatcher()/auth.protect() can be bypassed by crafted
 // requests that never reach the middleware's matcher. Route protection must
@@ -23,12 +33,7 @@ export default clerkMiddleware((auth, req) => {
   // rejects the session token and redirects to sign-in in a loop ("Unsafe
   // attempt to load URL ... from frame" console error). Git-staging is for testing
   // on preview vercel environment 
-  authorizedParties: [
-    'https://okhanahome.com',
-    'https://www.okhanahome.com',
-    'http://localhost:3000',
-    'https://okhana-git-staging-jakunin-olegs-projects.vercel.app/',
-  ],
+  authorizedParties,
 });
 
 export const config = {
@@ -41,17 +46,3 @@ export const config = {
     '/(ru|en)',
   ],
 };
-
-
-
-
-
-
-
-
-
-
-
-
-
-

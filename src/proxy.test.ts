@@ -7,8 +7,12 @@ vi.mock('next-intl/middleware', () => ({
   default: () => () => null,
 }));
 
+const mockClerkMiddlewareOptions = vi.hoisted(() => vi.fn());
 vi.mock('@clerk/nextjs/server', () => ({
-  clerkMiddleware: (handler: unknown) => handler,
+  clerkMiddleware: (handler: unknown, options: unknown) => {
+    mockClerkMiddlewareOptions(options);
+    return handler;
+  },
 }));
 
 vi.mock('./i18n/routing', () => ({
@@ -66,5 +70,28 @@ describe('proxy.ts handler', () => {
     // method) proves the handler never invokes it.
     const result = run({}, {});
     expect(result).toBeNull();
+  });
+});
+
+describe('proxy.ts Clerk options', () => {
+  it('authorizes origins without trailing slashes', async () => {
+    await import('./proxy');
+
+    expect(mockClerkMiddlewareOptions).toHaveBeenCalledWith(expect.objectContaining({
+      authorizedParties: expect.arrayContaining([
+        'https://okhana-git-staging-jakunin-olegs-projects.vercel.app',
+      ]),
+    }));
+  });
+
+  it('does not authorize origins with trailing slashes', async () => {
+    await import('./proxy');
+
+    const options = mockClerkMiddlewareOptions.mock.calls[0]?.[0] as {
+      authorizedParties?: string[];
+    };
+    expect(options.authorizedParties).not.toContain(
+      'https://okhana-git-staging-jakunin-olegs-projects.vercel.app/',
+    );
   });
 });
