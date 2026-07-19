@@ -21,11 +21,13 @@ export default clerkMiddleware((auth, req) => {
   // authorizedParties prevents subdomain cookie-leaking attacks (CSRF) and
   // must include every origin the app is reachable from — otherwise Clerk
   // rejects the session token and redirects to sign-in in a loop ("Unsafe
-  // attempt to load URL ... from frame" console error).
+  // attempt to load URL ... from frame" console error). Git-staging is for testing
+  // on preview vercel environment 
   authorizedParties: [
     'https://okhanahome.com',
     'https://www.okhanahome.com',
     'http://localhost:3000',
+    'https://okhana-git-staging-jakunin-olegs-projects.vercel.app/',
   ],
 });
 
