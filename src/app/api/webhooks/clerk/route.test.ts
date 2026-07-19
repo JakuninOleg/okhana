@@ -1,9 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { POST } from './route';
 
-const mockInsertValues = vi.fn(() => ({ onConflictDoNothing: vi.fn() }));
-const mockUpdateSet = vi.fn(() => ({ where: vi.fn() }));
-const mockDeleteWhere = vi.fn();
+const mockInsertValues = vi.hoisted(() => vi.fn(() => ({ onConflictDoNothing: vi.fn() })));
+const mockUpdateSet = vi.hoisted(() => vi.fn(() => ({ where: vi.fn() })));
+const mockDeleteWhere = vi.hoisted(() => vi.fn());
 
 vi.mock('svix', () => ({
   Webhook: vi.fn().mockImplementation(function (this: { verify: (body: string) => unknown }) {
@@ -34,6 +33,10 @@ function buildRequest(payload: object) {
   });
 }
 
+async function loadRoute() {
+  return await import('./route');
+}
+
 describe('POST /api/webhooks/clerk', () => {
   beforeEach(() => {
     process.env.CLERK_WEBHOOK_SECRET = 'test-secret';
@@ -42,11 +45,13 @@ describe('POST /api/webhooks/clerk', () => {
 
   it('returns 500 if webhook secret is not configured', async () => {
     delete process.env.CLERK_WEBHOOK_SECRET;
+    const { POST } = await loadRoute();
     const res = await POST(buildRequest({}));
     expect(res.status).toBe(500);
   });
 
   it('inserts a new user on user.created', async () => {
+    const { POST } = await loadRoute();
     const res = await POST(buildRequest({
       type: 'user.created',
       data: {
@@ -66,6 +71,7 @@ describe('POST /api/webhooks/clerk', () => {
   });
 
   it('updates an existing user on user.updated', async () => {
+    const { POST } = await loadRoute();
     const res = await POST(buildRequest({
       type: 'user.updated',
       data: {
@@ -83,6 +89,7 @@ describe('POST /api/webhooks/clerk', () => {
   });
 
   it('deletes a user on user.deleted', async () => {
+    const { POST } = await loadRoute();
     const res = await POST(buildRequest({
       type: 'user.deleted',
       data: { id: 'user_123' },

@@ -1,22 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock auth() — returns userId or null
-const mockAuth = vi.fn();
-vi.mock('@clerk/nextjs/server', () => ({
-  auth: () => mockAuth(),
-}));
+const mockAuth = vi.hoisted(() => vi.fn());
 
 // Mock revalidatePath — a no-op, but assert it was called on success
-const mockRevalidatePath = vi.fn();
-vi.mock('next/cache', () => ({
-  revalidatePath: (...args: unknown[]) => mockRevalidatePath(...args),
-}));
+const mockRevalidatePath = vi.hoisted(() => vi.fn());
 
 // Mock generateInviteCode — deterministic for happy-path assertions
-const mockGenerateInviteCode = vi.fn();
-vi.mock('@/lib/server/utils', () => ({
-  generateInviteCode: () => mockGenerateInviteCode(),
-}));
+const mockGenerateInviteCode = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/server/db/schema', () => ({
   users: { id: 'id', clerkId: 'clerk_id', familyId: 'family_id', familyRole: 'family_role' },
@@ -29,9 +20,9 @@ vi.mock('drizzle-orm', () => ({
 
 // Mock db — chainable select/insert/update. Each query builder records its
 // call so tests can assert which path was taken.
-const mockSelectLimit = vi.fn();
-const mockInsertReturning = vi.fn();
-const mockUpdateWhere = vi.fn();
+const mockSelectLimit = vi.hoisted(() => vi.fn());
+const mockInsertReturning = vi.hoisted(() => vi.fn());
+const mockUpdateWhere = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/server/db', () => ({
   db: {
@@ -61,6 +52,15 @@ vi.mock('@/lib/server/db', () => ({
 // use mockResolvedValueOnce to feed the user-lookup then the family-lookup.
 
 async function loadActions() {
+  vi.doMock('@clerk/nextjs/server', () => ({
+    auth: () => mockAuth(),
+  }));
+  vi.doMock('next/cache', () => ({
+    revalidatePath: (...args: unknown[]) => mockRevalidatePath(...args),
+  }));
+  vi.doMock('@/lib/server/utils', () => ({
+    generateInviteCode: () => mockGenerateInviteCode(),
+  }));
   // Fresh import so vi.mock hoisting + clearAllMocks compose predictably
   return await import('./actions');
 }

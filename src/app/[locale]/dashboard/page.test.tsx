@@ -1,8 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 
+vi.mock('@clerk/nextjs', () => ({
+  useClerk: () => ({ signOut: vi.fn() }),
+}));
+
+vi.mock('next-intl', () => ({
+  useTranslations: () => (key: string) => {
+    if (key === 'signOut') return 'Sign out';
+    return key;
+  },
+}));
+
 // Mock auth() — returns userId or null
-const mockAuth = vi.fn();
+const mockAuth = vi.hoisted(() => vi.fn());
 vi.mock('@clerk/nextjs/server', () => ({
   auth: () => mockAuth(),
   clerkClient: () => Promise.resolve({
@@ -19,10 +30,10 @@ vi.mock('@clerk/nextjs/server', () => ({
 // vitest Node environment, so we stub it and capture calls.
 // next-intl's redirect throws internally (like Next.js redirect) to halt
 // rendering, so the mock throws too.
-const mockRedirect = vi.fn((arg: unknown) => {
+const mockRedirect = vi.hoisted(() => vi.fn((arg: unknown) => {
   void arg;
   throw new Error('NEXT_REDIRECT');
-});
+}));
 vi.mock('@/i18n/navigation', () => ({
   redirect: (arg: unknown) => mockRedirect(arg),
 }));
@@ -39,12 +50,12 @@ vi.mock('next-intl/server', () => ({
 
 // Mock db query — supports both the main query (select → from → leftJoin → where → limit)
 // and the members query (select → from → where).
-const mockDbSelect = vi.fn();
-const mockMembersDbSelect = vi.fn();
-const mockWhere = vi.fn(() => ({
+const mockDbSelect = vi.hoisted(() => vi.fn());
+const mockMembersDbSelect = vi.hoisted(() => vi.fn());
+const mockWhere = vi.hoisted(() => vi.fn(() => ({
   limit: vi.fn(() => mockDbSelect()),
-}));
-const mockMembersWhere = vi.fn(() => mockMembersDbSelect());
+})));
+const mockMembersWhere = vi.hoisted(() => vi.fn(() => mockMembersDbSelect()));
 vi.mock('@/lib/server/db', () => ({
   db: {
     select: vi.fn(() => ({
@@ -72,6 +83,19 @@ vi.mock('./SignOutButtonClient', () => ({
   SignOutButtonClient: ({ locale }: { locale: string }) =>
     React.createElement('button', { 'data-locale': locale }, 'Sign out'),
 }));
+vi.mock('./SignOutButtonClient.tsx', () => ({
+  SignOutButtonClient: ({ locale }: { locale: string }) =>
+    React.createElement('button', { 'data-locale': locale }, 'Sign out'),
+}));
+
+vi.mock('@/features/family/invite-code-display', () => ({
+  InviteCodeDisplay: ({ code }: { code: string }) =>
+    React.createElement('div', null, code),
+}));
+
+vi.mock('@/features/family/family-setup-form', () => ({
+  FamilySetupForm: () => React.createElement('div', null, 'Family setup'),
+}));
 
 function extractText(node: unknown): string {
   if (typeof node === 'string') return node;
@@ -92,6 +116,14 @@ function renderToString(element: React.ReactElement): string {
   } catch {
     return extractText(element);
   }
+}
+
+function treeContainsProp(node: unknown, prop: string, value: unknown): boolean {
+  if (Array.isArray(node)) return node.some((child) => treeContainsProp(child, prop, value));
+  if (!node || typeof node !== 'object' || !('props' in node)) return false;
+
+  const props = (node as React.ReactElement).props as Record<string, unknown>;
+  return props[prop] === value || treeContainsProp(props.children, prop, value);
 }
 
 describe('Dashboard page', () => {
@@ -157,9 +189,7 @@ describe('Dashboard page', () => {
       params: Promise.resolve({ locale: 'ru' }),
     }) as React.ReactElement;
 
-    const html = renderToString(result);
-    expect(html).toContain('Sign out');
-    expect(html).toContain('data-locale="ru"');
+    expect(treeContainsProp(result, 'locale', 'ru')).toBe(true);
   });
 
   it('redirects to home page when user is not authenticated', async () => {
@@ -197,7 +227,7 @@ describe('Dashboard page', () => {
     const html = renderToString(result);
     // Family info block renders (invite code shown) — the members query
     // failure was caught and did not crash the page.
-    expect(html).toContain('ABCD2345');
+    expect(treeContainsProp(result, 'code', 'ABCD2345')).toBe(true);
     expect(html).toContain('familyInfo');
   });
 });
