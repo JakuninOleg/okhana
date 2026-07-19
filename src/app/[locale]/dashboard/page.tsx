@@ -4,9 +4,9 @@ import { getTranslations } from 'next-intl/server';
 import { db } from '@/lib/server/db';
 import { families, users } from '@/lib/server/db/schema';
 import { redirect } from '@/i18n/navigation';
+import { FamilySetupForm } from '@/features/family/family-setup-form';
+import { InviteCodeDisplay } from '@/features/family/invite-code-display';
 import { SignOutButtonClient } from './SignOutButtonClient';
-import { FamilySetupForm } from './family-setup-form';
-import { InviteCodeDisplay } from './invite-code-display';
 
 // Force dynamic rendering — auth() requires request context from middleware.
 export const dynamic = 'force-dynamic';
