@@ -78,16 +78,6 @@ vi.mock('drizzle-orm', () => ({
   eq: vi.fn(),
 }));
 
-// Mock the client component to avoid rendering Clerk context
-vi.mock('./SignOutButtonClient', () => ({
-  SignOutButtonClient: ({ locale }: { locale: string }) =>
-    React.createElement('button', { 'data-locale': locale }, 'Sign out'),
-}));
-vi.mock('./SignOutButtonClient.tsx', () => ({
-  SignOutButtonClient: ({ locale }: { locale: string }) =>
-    React.createElement('button', { 'data-locale': locale }, 'Sign out'),
-}));
-
 vi.mock('@/features/family/invite-code-display', () => ({
   InviteCodeDisplay: ({ code }: { code: string }) =>
     React.createElement('div', null, code),
@@ -116,14 +106,6 @@ function renderToString(element: React.ReactElement): string {
   } catch {
     return extractText(element);
   }
-}
-
-function treeContainsProp(node: unknown, prop: string, value: unknown): boolean {
-  if (Array.isArray(node)) return node.some((child) => treeContainsProp(child, prop, value));
-  if (!node || typeof node !== 'object' || !('props' in node)) return false;
-
-  const props = (node as React.ReactElement).props as Record<string, unknown>;
-  return props[prop] === value || treeContainsProp(props.children, prop, value);
 }
 
 describe('Dashboard page', () => {
@@ -178,20 +160,6 @@ describe('Dashboard page', () => {
     expect(html).toContain('Connection refused');
   });
 
-  it('renders sign-out button with correct locale', async () => {
-    mockAuth.mockResolvedValue({ userId: 'user_123' });
-    mockDbSelect
-      .mockResolvedValueOnce([{ email: 'test@example.com', familyId: null, familyName: null, inviteCode: null }]);
-
-    const { default: DashboardPage } = await import('./page');
-
-    const result = await DashboardPage({
-      params: Promise.resolve({ locale: 'ru' }),
-    }) as React.ReactElement;
-
-    expect(treeContainsProp(result, 'locale', 'ru')).toBe(true);
-  });
-
   it('redirects to home page when user is not authenticated', async () => {
     mockAuth.mockResolvedValue({ userId: null });
 
@@ -227,7 +195,7 @@ describe('Dashboard page', () => {
     const html = renderToString(result);
     // Family info block renders (invite code shown) — the members query
     // failure was caught and did not crash the page.
-    expect(treeContainsProp(result, 'code', 'ABCD2345')).toBe(true);
+    expect(html).toContain('ABCD2345');
     expect(html).toContain('familyInfo');
   });
 });

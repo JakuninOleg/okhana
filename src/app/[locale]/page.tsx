@@ -1,7 +1,5 @@
 import { auth } from '@clerk/nextjs/server';
-import { getTranslations } from 'next-intl/server';
-import { redirect, Link } from '@/i18n/navigation';
-import { buttonVariants } from '@/components/ui/button';
+import { redirect } from '@/i18n/navigation';
 
 // Force dynamic rendering — auth() requires request context from middleware.
 // Without this, Next.js prerenders the page during build (via generateStaticParams
@@ -21,19 +19,11 @@ export default async function Home({
     redirect({ href: '/dashboard', locale });
   }
 
-  const t = await getTranslations('Home');
-
   return (
     <main className="flex min-h-screen items-center justify-center p-6">
-      <Link
-        href="/sign-in"
-        className={buttonVariants({ size: 'lg' })}
-      >
-        {t('signIn')}
-      </Link>
+      <p>Hello!</p>
     </main>
   );
 }
-
 
 
