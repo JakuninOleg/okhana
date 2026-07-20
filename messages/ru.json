@@ -2,6 +2,9 @@
   "Home": {
     "signIn": "Войти"
   },
+  "Navbar": {
+    "signIn": "Войти"
+  },
   "Dashboard": {
     "greeting": "Привет, {email}",
     "signOut": "Выйти",
@@ -10,4 +13,3 @@
   }
 
 }
-

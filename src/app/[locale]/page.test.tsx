@@ -71,7 +71,7 @@ describe('Home page', () => {
     });
   });
 
-  it('renders sign-in button for unauthenticated users', async () => {
+  it('renders public home content for unauthenticated users', async () => {
     mockAuth.mockResolvedValue({ userId: null });
 
     const { default: Home } = await import('./page');
@@ -81,9 +81,8 @@ describe('Home page', () => {
     }) as React.ReactElement;
 
     expect(mockRedirect).not.toHaveBeenCalled();
-    // The component renders a <main> with a link containing "Sign in"
     const html = renderToString(result);
-    expect(html).toContain('Sign in');
+    expect(html).toContain('Hello!');
   });
 });
 
