@@ -2,9 +2,25 @@
 
 import { Loader2, Mic, Send, Square } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
-import { useEffect, useRef, useState, useEffectEvent, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState, useEffectEvent } from 'react';
+import { useSyncExternalStore } from 'react';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { ChatMessage } from '@/features/chat/chat-message';
 import type { FamilyChatMessage } from '@/features/chat/family-chat-storage';
 import {
@@ -17,55 +33,28 @@ import {
 } from '@/features/chat/family-chat-store';
 import { OkhanaAvatar } from '@/features/chat/okhana-avatar';
 import { readOpenAiChatStream } from '@/features/chat/read-openai-stream';
+import { useVoiceRecorder } from '@/features/chat/use-voice-recorder';
 import type { Locale } from '@/i18n/routing';
 import { cn } from '@/lib/utils';
 
 export type { FamilyChatMessage };
 
-type SpeechRecognitionConstructor = new () => SpeechRecognition;
-
-type SpeechRecognition = EventTarget & {
-  continuous: boolean;
-  interimResults: boolean;
-  lang: string;
-  start: () => void;
-  stop: () => void;
-  onresult: ((event: SpeechRecognitionEvent) => void) | null;
-  onend: (() => void) | null;
-  onerror: (() => void) | null;
-};
-
-type SpeechRecognitionEvent = {
-  results: ArrayLike<{ 0: { transcript: string }; isFinal: boolean }>;
-};
-
-type WindowWithSpeechRecognition = Window & {
-  SpeechRecognition?: SpeechRecognitionConstructor;
-  webkitSpeechRecognition?: SpeechRecognitionConstructor;
-};
-
-const speechLanguageByLocale = {
-  ru: 'ru-RU',
-  en: 'en-US',
-} satisfies Record<Locale, string>;
-
 type ChatStatus = 'idle' | 'loadingHistory' | 'streaming' | 'error';
+
+const sttLanguageByLocale = {
+  ru: 'ru',
+  en: 'en',
+} satisfies Record<Locale, string>;
 
 function createLocalId(prefix: string): string {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 }
 
-function subscribeNever(): () => void {
-  return () => undefined;
-}
-
-function getSpeechSupported(): boolean {
-  const browserWindow = window as WindowWithSpeechRecognition;
-  return Boolean(browserWindow.SpeechRecognition ?? browserWindow.webkitSpeechRecognition);
-}
-
-function getSpeechSupportedServer(): boolean {
-  return false;
+function formatElapsed(ms: number): string {
+  const totalSeconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 }
 
 export function FamilyChat(): React.JSX.Element {
@@ -79,15 +68,21 @@ export function FamilyChat(): React.JSX.Element {
   const { messages, input } = chat;
   const [status, setStatus] = useState<ChatStatus>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isListening, setIsListening] = useState(false);
-  const speechSupported = useSyncExternalStore(
-    subscribeNever,
-    getSpeechSupported,
-    getSpeechSupportedServer,
-  );
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
+
+  const voice = useVoiceRecorder({
+    language: sttLanguageByLocale[locale],
+    disabled: status === 'streaming',
+    onTranscript: (text) => {
+      updateFamilyChatInput(text);
+      setErrorMessage(null);
+    },
+    onError: (message) => {
+      setErrorMessage(message);
+      setStatus('error');
+    },
+  });
 
   const scrollToBottom = useEffectEvent(() => {
     const list = listRef.current;
@@ -99,7 +94,7 @@ export function FamilyChat(): React.JSX.Element {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, status]);
+  }, [messages, status, voice.phase]);
 
   useEffect(() => {
     const existing = getFamilyChatSnapshot();
@@ -109,7 +104,6 @@ export function FamilyChat(): React.JSX.Element {
 
     let cancelled = false;
     const controller = new AbortController();
-    // Don't block the composer forever if Supabase/VPN stalls the history request.
     const timeoutId = window.setTimeout(() => controller.abort(), 6_000);
 
     async function loadHistory(): Promise<void> {
@@ -148,32 +142,9 @@ export function FamilyChat(): React.JSX.Element {
   useEffect(() => {
     return () => {
       abortRef.current?.abort();
-      recognitionRef.current?.stop();
+      voice.stop();
     };
   }, []);
-
-  function createSpeechRecognition(): SpeechRecognition | null {
-    const browserWindow = window as WindowWithSpeechRecognition;
-    const Recognition = browserWindow.SpeechRecognition ?? browserWindow.webkitSpeechRecognition;
-    if (!Recognition) {
-      return null;
-    }
-
-    const speechRecognition = new Recognition();
-    speechRecognition.continuous = false;
-    speechRecognition.interimResults = true;
-    speechRecognition.lang = speechLanguageByLocale[locale];
-    speechRecognition.onresult = (event) => {
-      let transcript = '';
-      for (let index = 0; index < event.results.length; index += 1) {
-        transcript += event.results[index][0].transcript;
-      }
-      updateFamilyChatInput(transcript.trim());
-    };
-    speechRecognition.onend = () => setIsListening(false);
-    speechRecognition.onerror = () => setIsListening(false);
-    return speechRecognition;
-  }
 
   async function submitMessage(): Promise<void> {
     const text = input.trim();
@@ -181,10 +152,9 @@ export function FamilyChat(): React.JSX.Element {
       return;
     }
 
+    voice.stop();
     updateFamilyChatInput('');
     setErrorMessage(null);
-    setIsListening(false);
-    recognitionRef.current?.stop();
 
     const userMessage: FamilyChatMessage = {
       id: createLocalId('user'),
@@ -262,145 +232,188 @@ export function FamilyChat(): React.JSX.Element {
     setStatus('idle');
   }
 
-  function toggleListening(): void {
-    if (!speechSupported) {
-      return;
-    }
-    const recognition = recognitionRef.current ?? createSpeechRecognition();
-    if (!recognition) {
-      return;
-    }
-    recognitionRef.current = recognition;
+  const busy = status === 'streaming' || voice.phase === 'transcribing';
+  const recording = voice.phase === 'recording' || voice.phase === 'warning';
+  const ttsEnabled = locale === 'en';
 
-    if (isListening) {
-      recognition.stop();
-      setIsListening(false);
-      return;
-    }
-    recognition.start();
-    setIsListening(true);
-  }
-
-  const busy = status === 'streaming';
   const statusLine =
-    status === 'streaming' ? t('statusThinking') : status === 'loadingHistory' ? t('loadingHistory') : t('statusReady');
+    voice.phase === 'transcribing'
+      ? t('statusTranscribing')
+      : voice.phase === 'warning'
+        ? t('statusRecordingWarn')
+        : voice.phase === 'recording'
+          ? t('statusRecording')
+          : status === 'streaming'
+            ? t('statusThinking')
+            : status === 'loadingHistory'
+              ? t('loadingHistory')
+              : t('statusReady');
 
   return (
-    <section
-      className={cn(
-        'flex w-full max-w-2xl flex-col overflow-hidden rounded-3xl',
-        'border border-border/60 bg-background/80 shadow-sm',
-        'dark:bg-background/60',
-      )}
-    >
-      <header className="flex items-start gap-3 border-b border-border/60 px-5 py-4">
-        <OkhanaAvatar size="lg" label={t('assistantName')} />
-        <div className="min-w-0 flex-1">
-          <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">{t('eyebrow')}</p>
-          <h2 className="mt-1 text-xl font-semibold tracking-tight text-foreground">{t('title')}</h2>
-          <p className="mt-1 text-sm text-muted-foreground">{t('description')}</p>
-          <p className="mt-2 text-xs text-muted-foreground/90" aria-live="polite">
-            {statusLine}
-          </p>
-        </div>
-      </header>
-
-      <div
-        ref={listRef}
-        className="h-[26rem] space-y-5 overflow-y-auto px-4 py-5 sm:px-5"
-        aria-live="polite"
-      >
-        {status === 'loadingHistory' ? (
-          <div className="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="size-4 animate-spin" />
-            {t('loadingHistory')}
-          </div>
-        ) : messages.length === 0 ? (
-          <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
+    <TooltipProvider>
+      <Card className="w-full max-w-2xl gap-0 overflow-hidden border-border/60 bg-card/90 py-0 shadow-sm backdrop-blur-sm">
+        <CardHeader className="gap-3 border-b border-border/60 px-5 py-4">
+          <div className="flex items-start gap-3">
             <OkhanaAvatar size="lg" label={t('assistantName')} />
-            <div className="space-y-1">
-              <p className="text-sm font-medium text-foreground">{t('emptyTitle')}</p>
-              <p className="text-sm text-muted-foreground">{t('emptyHistory')}</p>
+            <div className="min-w-0 flex-1 space-y-1">
+              <p className="text-[0.7rem] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                {t('eyebrow')}
+              </p>
+              <CardTitle className="text-xl tracking-tight">{t('title')}</CardTitle>
+              <CardDescription>{t('description')}</CardDescription>
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <p className="text-xs text-muted-foreground" aria-live="polite">
+                  {statusLine}
+                </p>
+                {recording ? (
+                  <Badge variant={voice.phase === 'warning' ? 'destructive' : 'secondary'}>
+                    {formatElapsed(voice.elapsedMs)}
+                  </Badge>
+                ) : null}
+              </div>
             </div>
           </div>
-        ) : (
-          messages.map((message) => (
-            <ChatMessage
-              key={message.id}
-              role={message.role}
-              content={message.content}
-              isStreaming={status === 'streaming'}
-              assistantName={t('assistantName')}
-              thinkingLabel={t('thinking')}
-            />
-          ))
-        )}
-      </div>
+        </CardHeader>
 
-      {errorMessage ? (
-        <p className="px-5 pb-2 text-sm text-destructive" role="alert">
-          {errorMessage}
-        </p>
-      ) : null}
-
-      <div className="border-t border-border/60 bg-muted/20 p-3 backdrop-blur-sm dark:bg-muted/10">
-        <div
-          className={cn(
-            'flex items-center gap-2 rounded-2xl border border-border/70 bg-background/90 p-1.5 shadow-sm',
-            'dark:bg-background/80',
-          )}
-        >
-          <Button
-            type="button"
-            variant={isListening ? 'destructive' : 'ghost'}
-            size="icon"
-            disabled={!speechSupported || busy}
-            onClick={toggleListening}
-            aria-label={t('voiceInput')}
-            title={speechSupported ? t('voiceInput') : t('voiceUnsupported')}
-            className="shrink-0 rounded-xl"
+        <CardContent className="px-0 py-0">
+          <div
+            ref={listRef}
+            className="h-[26rem] space-y-5 overflow-y-auto px-4 py-5 sm:px-5"
+            aria-live="polite"
           >
-            <Mic />
-          </Button>
-          <Input
-            value={input}
-            onChange={(event) => updateFamilyChatInput(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' && !event.shiftKey) {
-                event.preventDefault();
-                void submitMessage();
-              }
-            }}
-            placeholder={t('placeholder')}
-            disabled={busy}
-            aria-label={t('placeholder')}
-            className="border-0 bg-transparent shadow-none focus-visible:ring-0"
-          />
-          {status === 'streaming' ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={stopStreaming}
-              aria-label={t('stopResponse')}
-              className="shrink-0 rounded-xl"
-            >
-              <Square />
-            </Button>
-          ) : (
-            <Button
-              type="button"
-              size="icon"
-              onClick={() => void submitMessage()}
-              disabled={!input.trim() || busy}
-              aria-label={t('send')}
-              className="shrink-0 rounded-xl"
-            >
-              <Send />
-            </Button>
-          )}
-        </div>
-      </div>
-    </section>
+            {status === 'loadingHistory' ? (
+              <div className="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="size-4 animate-spin" />
+                {t('loadingHistory')}
+              </div>
+            ) : messages.length === 0 ? (
+              <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
+                <OkhanaAvatar size="lg" label={t('assistantName')} />
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-foreground">{t('emptyTitle')}</p>
+                  <p className="text-sm text-muted-foreground">{t('emptyHistory')}</p>
+                </div>
+              </div>
+            ) : (
+              messages.map((message) => (
+                <ChatMessage
+                  key={message.id}
+                  role={message.role}
+                  content={message.content}
+                  isStreaming={status === 'streaming'}
+                  assistantName={t('assistantName')}
+                  thinkingLabel={t('thinking')}
+                  speakLabel={t('speak')}
+                  speakingLabel={t('speaking')}
+                  speakUnavailableLabel={t('speakUnavailable')}
+                  locale={locale}
+                  ttsEnabled={ttsEnabled}
+                />
+              ))
+            )}
+          </div>
+        </CardContent>
+
+        {errorMessage ? (
+          <p className="px-5 pb-2 text-sm text-destructive" role="alert">
+            {errorMessage}
+          </p>
+        ) : null}
+
+        <CardFooter className="flex-col items-stretch gap-2 border-border/60 bg-muted/20 px-3 py-3 dark:bg-muted/10">
+          <div
+            className={cn(
+              'flex items-end gap-2 rounded-2xl border border-border/70 bg-background/90 p-2 shadow-sm',
+              'dark:bg-background/80',
+              recording && 'border-destructive/40 ring-2 ring-destructive/15',
+            )}
+          >
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    type="button"
+                    variant={recording ? 'destructive' : 'ghost'}
+                    size="icon"
+                    disabled={!voice.supported || busy}
+                    onClick={voice.toggle}
+                    aria-label={t('voiceInput')}
+                    className="shrink-0 rounded-xl"
+                  />
+                }
+              >
+                {voice.phase === 'transcribing' ? <Loader2 className="animate-spin" /> : <Mic />}
+              </TooltipTrigger>
+              <TooltipContent>
+                {voice.supported
+                  ? recording
+                    ? t('voiceStop')
+                    : t('voiceInput')
+                  : t('voiceUnsupported')}
+              </TooltipContent>
+            </Tooltip>
+
+            <Textarea
+              value={input}
+              onChange={(event) => updateFamilyChatInput(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && !event.shiftKey) {
+                  event.preventDefault();
+                  void submitMessage();
+                }
+              }}
+              placeholder={t('placeholder')}
+              disabled={busy}
+              aria-label={t('placeholder')}
+              rows={1}
+              className="min-h-10 max-h-32 resize-none border-0 bg-transparent px-1 py-2 shadow-none focus-visible:ring-0"
+            />
+
+            {status === 'streaming' ? (
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={stopStreaming}
+                      aria-label={t('stopResponse')}
+                      className="shrink-0 rounded-xl"
+                    />
+                  }
+                >
+                  <Square />
+                </TooltipTrigger>
+                <TooltipContent>{t('stopResponse')}</TooltipContent>
+              </Tooltip>
+            ) : (
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      type="button"
+                      size="icon"
+                      onClick={() => void submitMessage()}
+                      disabled={!input.trim() || busy}
+                      aria-label={t('send')}
+                      className="shrink-0 rounded-xl"
+                    />
+                  }
+                >
+                  <Send />
+                </TooltipTrigger>
+                <TooltipContent>{t('send')}</TooltipContent>
+              </Tooltip>
+            )}
+          </div>
+          {recording ? (
+            <p className="px-1 text-xs text-muted-foreground">
+              {voice.phase === 'warning' ? t('recordingWarnHint') : t('recordingHint')}
+            </p>
+          ) : null}
+        </CardFooter>
+      </Card>
+    </TooltipProvider>
   );
 }

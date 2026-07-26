@@ -13,7 +13,7 @@ export type FamilyChatSnapshot = {
 
 /** Stable empty snapshot for SSR / hydration (must be referentially equal across calls). */
 const SERVER_SNAPSHOT: FamilyChatSnapshot = Object.freeze({
-  messages: Object.freeze([]) as FamilyChatMessage[],
+  messages: [] as FamilyChatMessage[],
   input: '',
 });
 

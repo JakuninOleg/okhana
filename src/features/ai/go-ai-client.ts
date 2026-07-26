@@ -46,6 +46,68 @@ export async function goAiChatCompletions(options: GoAiChatCompletionsOptions): 
   });
 }
 
+export type GoAiAudioTranscriptionsOptions = {
+  /** Raw multipart body from the browser — must include Content-Length. */
+  body: BodyInit | null;
+  contentType: string;
+  contentLength: string;
+  signal?: AbortSignal;
+  config?: GoAiClientConfig;
+  fetchImpl?: typeof fetch;
+};
+
+/**
+ * Proxy STT to Go-Ai. Preserves multipart Content-Type and Content-Length;
+ * do not invent length by buffering the full upload.
+ */
+export async function goAiAudioTranscriptions(
+  options: GoAiAudioTranscriptionsOptions,
+): Promise<Response> {
+  const config = options.config ?? getGoAiConfig();
+  const fetchImpl = options.fetchImpl ?? fetch;
+
+  return fetchImpl(`${config.baseUrl}/v1/audio/transcriptions`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${config.sharedSecret}`,
+      'Content-Type': options.contentType,
+      'Content-Length': options.contentLength,
+    },
+    body: options.body,
+    signal: options.signal,
+  });
+}
+
+export type GoAiSpeechRequest = {
+  model: string;
+  input: string;
+  voice: string;
+  response_format?: string;
+};
+
+export type GoAiAudioSpeechOptions = {
+  body: GoAiSpeechRequest;
+  signal?: AbortSignal;
+  config?: GoAiClientConfig;
+  fetchImpl?: typeof fetch;
+};
+
+/** Proxy TTS to Go-Ai. Returns a binary audio stream — never parse as JSON. */
+export async function goAiAudioSpeech(options: GoAiAudioSpeechOptions): Promise<Response> {
+  const config = options.config ?? getGoAiConfig();
+  const fetchImpl = options.fetchImpl ?? fetch;
+
+  return fetchImpl(`${config.baseUrl}/v1/audio/speech`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${config.sharedSecret}`,
+    },
+    body: JSON.stringify(options.body),
+    signal: options.signal,
+  });
+}
+
 export type GoAiSafeError = {
   status: number;
   /** Safe, user-facing summary — never includes prompts, secrets, or raw bodies. */
