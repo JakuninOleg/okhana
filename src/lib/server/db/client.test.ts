@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockEnd = vi.hoisted(() => vi.fn(async () => undefined));
-const mockPostgres = vi.hoisted(() => vi.fn(() => ({ end: mockEnd })));
+const mockPostgres = vi.hoisted(() =>
+  vi.fn((_url: unknown, _options?: unknown) => ({ end: mockEnd })),
+);
 
 vi.mock('postgres', () => ({
-  default: (...args: unknown[]) => mockPostgres(...args),
+  default: (url: unknown, options?: unknown) => mockPostgres(url, options),
 }));
 
 describe('withDbRetry', () => {
@@ -16,7 +18,7 @@ describe('withDbRetry', () => {
     delete (globalThis as { __okhanaSqlReset?: unknown }).__okhanaSqlReset;
     delete (globalThis as { __okhanaSqlCreatedAt?: unknown }).__okhanaSqlCreatedAt;
     delete (globalThis as { __okhanaDbMutex?: unknown }).__okhanaDbMutex;
-    process.env.NODE_ENV = 'development';
+    vi.stubEnv('NODE_ENV', 'development');
     process.env.DATABASE_URL = 'postgresql://localhost:6543/okhana';
     delete process.env.DIRECT_URL;
     delete process.env.VERCEL;

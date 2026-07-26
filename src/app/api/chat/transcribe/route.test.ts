@@ -2,9 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockAuth = vi.hoisted(() => vi.fn());
 const mockGetGoAiConfig = vi.hoisted(() => vi.fn());
-const mockGoAiAudioTranscriptions = vi.hoisted(() => vi.fn());
+const mockGoAiAudioTranscriptions = vi.hoisted(() =>
+  vi.fn(async (_options: unknown): Promise<Response> => new Response()),
+);
 const mockReadGoAiSafeError = vi.hoisted(() =>
-  vi.fn(async () => ({ status: 502, message: 'upstream', code: null })),
+  vi.fn(async (_response: unknown) => ({ status: 502, message: 'upstream', code: null })),
 );
 
 vi.mock('@clerk/nextjs/server', () => ({
@@ -13,8 +15,8 @@ vi.mock('@clerk/nextjs/server', () => ({
 
 vi.mock('@/features/ai/go-ai-client', () => ({
   getGoAiConfig: () => mockGetGoAiConfig(),
-  goAiAudioTranscriptions: (...args: unknown[]) => mockGoAiAudioTranscriptions(...args),
-  readGoAiSafeError: (...args: unknown[]) => mockReadGoAiSafeError(...args),
+  goAiAudioTranscriptions: (options: unknown) => mockGoAiAudioTranscriptions(options),
+  readGoAiSafeError: (response: unknown) => mockReadGoAiSafeError(response),
 }));
 
 describe('POST /api/chat/transcribe', () => {
@@ -82,11 +84,11 @@ describe('POST /api/chat/transcribe', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ text: 'buy milk' });
     expect(mockGoAiAudioTranscriptions).toHaveBeenCalledOnce();
-    const call = mockGoAiAudioTranscriptions.mock.calls[0]?.[0] as {
-      contentType: string;
-      contentLength: string;
-      body: Buffer;
-    };
+    const call = (
+      mockGoAiAudioTranscriptions.mock.calls as unknown as Array<
+        [{ contentType: string; contentLength: string; body: Buffer }]
+      >
+    )[0]?.[0];
     expect(call.contentType).toMatch(/multipart\/form-data/i);
     expect(Number(call.contentLength)).toBe(call.body.byteLength);
   });

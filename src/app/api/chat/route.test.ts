@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockAuth = vi.hoisted(() => vi.fn());
-const mockCreateChatWithToolsStream = vi.hoisted(() => vi.fn(() => new Response('stream')));
+const mockCreateChatWithToolsStream = vi.hoisted(() =>
+  vi.fn((_options: unknown) => new Response('stream')),
+);
 const mockGetGoAiConfig = vi.hoisted(() => vi.fn());
 
 const userRow = {
@@ -51,7 +53,7 @@ vi.mock('@/features/ai/go-ai-client', () => ({
 }));
 
 vi.mock('@/features/ai/chat-with-tools', () => ({
-  createChatWithToolsStream: (...args: unknown[]) => mockCreateChatWithToolsStream(...args),
+  createChatWithToolsStream: (options: unknown) => mockCreateChatWithToolsStream(options),
 }));
 
 vi.mock('@/lib/server/db', () => ({
@@ -184,10 +186,16 @@ describe('POST /api/chat', () => {
 
     expect(res).toBeInstanceOf(Response);
     expect(mockCreateChatWithToolsStream).toHaveBeenCalledOnce();
-    const arg = mockCreateChatWithToolsStream.mock.calls[0]?.[0] as {
-      toolContext: { familyId: number; userId: number; familyRole: string };
-      messages: Array<{ role: string }>;
-    };
+    const arg = (
+      mockCreateChatWithToolsStream.mock.calls as unknown as Array<
+        [
+          {
+            toolContext: { familyId: number; userId: number; familyRole: string };
+            messages: Array<{ role: string }>;
+          },
+        ]
+      >
+    )[0]?.[0];
     expect(arg.toolContext).toEqual({ familyId: 3, userId: 9, familyRole: 'owner' });
     expect(arg.messages[0]?.role).toBe('system');
     expect(arg.messages.some((message) => message.role === 'user')).toBe(true);

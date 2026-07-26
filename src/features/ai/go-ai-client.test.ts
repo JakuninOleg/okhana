@@ -60,7 +60,7 @@ describe('goAiChatCompletions', () => {
     });
 
     expect(fetchImpl).toHaveBeenCalledOnce();
-    const [url, init] = fetchImpl.mock.calls[0] as [string, RequestInit];
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe('https://go-ai.example/v1/chat/completions');
     expect(init.method).toBe('POST');
     expect(init.headers).toMatchObject({

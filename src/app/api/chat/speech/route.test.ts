@@ -2,9 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockAuth = vi.hoisted(() => vi.fn());
 const mockGetGoAiConfig = vi.hoisted(() => vi.fn());
-const mockGoAiAudioSpeech = vi.hoisted(() => vi.fn());
+const mockGoAiAudioSpeech = vi.hoisted(() =>
+  vi.fn(async (_options: unknown): Promise<Response> => new Response()),
+);
 const mockReadGoAiSafeError = vi.hoisted(() =>
-  vi.fn(async () => ({ status: 502, message: 'upstream', code: null })),
+  vi.fn(async (_response: unknown) => ({ status: 502, message: 'upstream', code: null })),
 );
 
 vi.mock('@clerk/nextjs/server', () => ({
@@ -13,8 +15,8 @@ vi.mock('@clerk/nextjs/server', () => ({
 
 vi.mock('@/features/ai/go-ai-client', () => ({
   getGoAiConfig: () => mockGetGoAiConfig(),
-  goAiAudioSpeech: (...args: unknown[]) => mockGoAiAudioSpeech(...args),
-  readGoAiSafeError: (...args: unknown[]) => mockReadGoAiSafeError(...args),
+  goAiAudioSpeech: (options: unknown) => mockGoAiAudioSpeech(options),
+  readGoAiSafeError: (response: unknown) => mockReadGoAiSafeError(response),
 }));
 
 describe('POST /api/chat/speech', () => {
