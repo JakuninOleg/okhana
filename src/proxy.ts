@@ -1,5 +1,6 @@
 import { clerkMiddleware } from '@clerk/nextjs/server';
 import createMiddleware from 'next-intl/middleware';
+import { NextResponse } from 'next/server';
 import { routing } from './i18n/routing';
 
 const intlMiddleware = createMiddleware(routing);
@@ -25,6 +26,10 @@ const authorizedParties = [
 // each protected page is responsible for its own explicit auth() check with
 // a redirect (see src/app/[locale]/dashboard/page.tsx for the pattern).
 export default clerkMiddleware((auth, req) => {
+  if (req.nextUrl.pathname.startsWith('/api/')) {
+    return NextResponse.next();
+  }
+
   return intlMiddleware(req);
 }, {
   // Production is served both as okhanahome.com and www.okhanahome.com.
@@ -42,6 +47,7 @@ export const config = {
   // dynamic routes like /ru or /en. Using an explicit matcher instead.
   matcher: [
     '/',
+    '/api/:path*',
     '/(ru|en)/:path*',
     '/(ru|en)',
   ],

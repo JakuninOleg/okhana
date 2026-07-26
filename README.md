@@ -191,10 +191,13 @@ npm run dev
 
 | Variable | Description |
 |---|---|
-| `DATABASE_URL` | Supabase PostgreSQL connection string |
+| `DATABASE_URL` | Supabase transaction pooler (`:6543`). Used by the Next.js app at runtime |
+| `DIRECT_URL` | Session/direct Postgres URL (`:5432`). **Migrations only** (`drizzle-kit`) — do not point the app at this or you will hit `EMAXCONNSESSION` (pool ~15) |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk publishable key |
 | `CLERK_SECRET_KEY` | Clerk secret key |
 | `CLERK_WEBHOOK_SECRET` | Clerk webhook signing secret |
+| `GO_AI_BASE_URL` | Go-Ai gateway base URL (server-only) |
+| `GO_AI_SHARED_SECRET` | Go-Ai bearer secret (server-only, never `NEXT_PUBLIC_*`) |
 
 ### Clerk: Development vs Production Keys
 

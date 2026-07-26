@@ -5,6 +5,7 @@ export default defineConfig({
   out: './drizzle',
   dialect: 'postgresql',
   dbCredentials: {
-    url: process.env.DATABASE_URL!,
+    // Session/direct URL for DDL; fall back to DATABASE_URL if unset.
+    url: process.env.DIRECT_URL ?? process.env.DATABASE_URL!,
   },
 });

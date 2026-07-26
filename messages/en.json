@@ -9,7 +9,35 @@
     "greeting": "Hello, {email}",
     "signOut": "Sign out",
     "familyInfo": "Your family: {name}",
-    "members": "Family members"
+    "members": "Family members",
+    "voiceChat": {
+      "eyebrow": "Family assistant",
+      "assistantName": "Okhana",
+      "title": "Chat with Okhana",
+      "description": "Ask Okhana to remember a note, find saved information, or just talk.",
+      "statusReady": "Ready when you are",
+      "statusThinking": "Okhana is responding…",
+      "statusRecording": "Listening… release to send",
+      "statusRecordingWarn": "Almost at the 5-minute limit — finishing soon",
+      "statusTranscribing": "Turning your voice into text…",
+      "emptyTitle": "Start the conversation",
+      "emptyHistory": "History is empty for now. Hold the mic to talk, or type a message.",
+      "loadingHistory": "Loading conversation…",
+      "thinking": "Okhana is thinking…",
+      "voiceInput": "Hold to talk",
+      "voiceHold": "Hold to talk, release to send",
+      "voiceHoldHint": "Hold the mic to talk — release to send automatically.",
+      "voiceUnsupported": "Voice input is not supported in this browser",
+      "recordingHint": "Recording — release the mic to send, or wait for the 5-minute limit.",
+      "recordingWarnHint": "Warning: recording stops automatically at 5:00.",
+      "ttsToggle": "Speak replies",
+      "ttsOnHint": "Auto-speak on",
+      "placeholder": "Type a message",
+      "stopResponse": "Stop response",
+      "send": "Send",
+      "requestFailed": "Could not reach Okhana. Try again.",
+      "streamUnavailable": "Streaming is not available in this browser."
+    }
   }
 
 }

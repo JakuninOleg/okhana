@@ -1,25 +1,38 @@
-import { drizzle } from 'drizzle-orm/postgres-js';
-import postgres from 'postgres';
+import { drizzle, type PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import * as schema from './schema';
+import { getSql } from './client';
 
-// Serverless-optimised configuration (Vercel).
-//
-// pg.Pool keeps idle connections open and relies on background timers, but
-// Vercel freezes the function's process the instant the response is sent.
-// Any query that hasn't fully completed by then is silently dropped — the
-// client gets a 200, the DB never receives the INSERT/UPDATE. This is why
-// the Clerk webhook "succeeded" but no user row appeared in Supabase.
-//
-// postgres.js is single-connection by default and finishes work inline.
-// We force max connections to 1 (each serverless invocation is isolated
-// and should not try to multiplex), disable prepared statements (required
-// for Supabase's PgBouncer pooler in transaction mode on port 6543), and
-// keep idle/connect timeouts short so a stuck socket never blocks a request.
-const client = postgres(process.env.DATABASE_URL!, {
-  max: 1,
-  idle_timeout: 5,
-  connect_timeout: 10,
-  prepare: false,
+type AppDb = PostgresJsDatabase<typeof schema>;
+
+type GlobalDb = typeof globalThis & {
+  __okhanaDb?: AppDb;
+  __okhanaDbInvalid?: boolean;
+};
+
+function createDb(): AppDb {
+  return drizzle(getSql(), { schema });
+}
+
+export function getDb(): AppDb {
+  const globalDb = globalThis as GlobalDb;
+  if (!globalDb.__okhanaDb || globalDb.__okhanaDbInvalid) {
+    globalDb.__okhanaDb = createDb();
+    globalDb.__okhanaDbInvalid = false;
+  }
+  return globalDb.__okhanaDb;
+}
+
+/**
+ * Keep existing `import { db }` call sites working while always resolving to
+ * the current SQL client (important after reconnect/retry).
+ */
+export const db: AppDb = new Proxy({} as AppDb, {
+  get(_target, property, receiver) {
+    const current = getDb();
+    const value = Reflect.get(current as object, property, receiver);
+    if (typeof value === 'function') {
+      return (value as (...args: unknown[]) => unknown).bind(current);
+    }
+    return value;
+  },
 });
-
-export const db = drizzle(client, { schema });
