@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 
 /** Frontend UX contract from Go-Ai voice docs — not trusted server validation. */
 export const VOICE_CAPTURE_MAX_MS = 300_000;
@@ -34,10 +34,27 @@ function pickMimeType(): string | undefined {
   return candidates.find((type) => MediaRecorder.isTypeSupported(type));
 }
 
+function subscribeVoiceSupport(): () => void {
+  return () => undefined;
+}
+
+function getVoiceSupportedClient(): boolean {
+  return typeof MediaRecorder !== 'undefined'
+    && Boolean(navigator.mediaDevices?.getUserMedia);
+}
+
+function getVoiceSupportedServer(): boolean {
+  return false;
+}
+
 export function useVoiceRecorder(options: UseVoiceRecorderOptions): UseVoiceRecorderResult {
   const [phase, setPhase] = useState<VoiceRecorderPhase>('idle');
   const [elapsedMs, setElapsedMs] = useState(0);
-  const [supported, setSupported] = useState(false);
+  const supported = useSyncExternalStore(
+    subscribeVoiceSupport,
+    getVoiceSupportedClient,
+    getVoiceSupportedServer,
+  );
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -50,14 +67,6 @@ export function useVoiceRecorder(options: UseVoiceRecorderOptions): UseVoiceReco
   const pressingRef = useRef(false);
   const optionsRef = useRef(options);
   optionsRef.current = options;
-
-  useEffect(() => {
-    setSupported(
-      typeof window !== 'undefined'
-      && typeof MediaRecorder !== 'undefined'
-      && Boolean(navigator.mediaDevices?.getUserMedia),
-    );
-  }, []);
 
   useEffect(() => {
     return () => {

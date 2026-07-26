@@ -86,18 +86,15 @@ export function FamilyChat(): React.JSX.Element {
   const speechAbortRef = useRef<AbortController | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
   const statusRef = useRef(status);
-  statusRef.current = status;
-
-  const submitFromVoice = useEffectEvent((text: string) => {
-    void submitMessage(text);
-  });
+  const submitMessageRef = useRef<(text?: string) => Promise<void>>(async () => undefined);
+  const stopVoiceRef = useRef<() => void>(() => undefined);
 
   const voice = useVoiceRecorder({
     language: sttLanguageByLocale[locale],
     disabled: status === 'streaming',
     onTranscript: (text) => {
       setErrorMessage(null);
-      submitFromVoice(text);
+      void submitMessageRef.current(text);
     },
     onError: (message) => {
       setErrorMessage(message);
@@ -116,6 +113,16 @@ export function FamilyChat(): React.JSX.Element {
   useEffect(() => {
     scrollToBottom();
   }, [messages, status, voice.phase]);
+
+  useEffect(() => {
+    statusRef.current = status;
+  }, [status]);
+
+  // Keep latest stop/submit without putting voice or submitMessage in effect deps.
+  useEffect(() => {
+    stopVoiceRef.current = () => voice.stop();
+    submitMessageRef.current = submitMessage;
+  });
 
   useEffect(() => {
     const existing = getFamilyChatSnapshot();
@@ -164,7 +171,7 @@ export function FamilyChat(): React.JSX.Element {
     return () => {
       abortRef.current?.abort();
       speechAbortRef.current?.abort();
-      voice.stop();
+      stopVoiceRef.current();
     };
   }, []);
 

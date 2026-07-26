@@ -193,7 +193,7 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   // Hot path: memory cache only. Never wait on Supabase before the first Go-Ai token.
-  let context = contextFromCache(clerkUserId);
+  const context = contextFromCache(clerkUserId);
   if (!context) {
     void loadChatContextFromDb(clerkUserId).catch(() => undefined);
   }

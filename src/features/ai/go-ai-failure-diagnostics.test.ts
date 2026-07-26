@@ -236,8 +236,6 @@ describe('live Go-Ai two-turn synthetic tool loop', () => {
         messages: [{ role: 'user', content: 'Call get_weather for Paris.' }],
       },
     });
-
-    // eslint-disable-next-line no-console
     console.info('Go-Ai tool-loop diag turn1', {
       status: turn1.status,
       goAiProvider: turn1.headers.get('X-Go-Ai-Provider'),
@@ -253,7 +251,6 @@ describe('live Go-Ai two-turn synthetic tool loop', () => {
     const { assembleOpenAiSseStream } = await import('@/features/ai/openai-sse');
     const assembled = await assembleOpenAiSseStream(turn1.body);
     if (assembled.toolCalls.length === 0) {
-      // eslint-disable-next-line no-console
       console.info('Go-Ai tool-loop diag turn1', { toolCallsCount: 0 });
       return;
     }
@@ -288,8 +285,6 @@ describe('live Go-Ai two-turn synthetic tool loop', () => {
         messages: followUpMessages,
       },
     });
-
-    // eslint-disable-next-line no-console
     console.info('Go-Ai tool-loop diag turn2', {
       status: turn2.status,
       goAiProvider: turn2.headers.get('X-Go-Ai-Provider'),
