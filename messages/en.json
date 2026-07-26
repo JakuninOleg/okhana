@@ -9,7 +9,26 @@
     "greeting": "Hello, {email}",
     "signOut": "Sign out",
     "familyInfo": "Your family: {name}",
-    "members": "Family members"
+    "members": "Family members",
+    "voiceChat": {
+      "eyebrow": "Family assistant",
+      "assistantName": "Okhana",
+      "title": "Chat with Okhana",
+      "description": "Ask Okhana to remember a note, find saved information, or just talk.",
+      "statusReady": "Ready when you are",
+      "statusThinking": "Okhana is responding…",
+      "emptyTitle": "Start the conversation",
+      "emptyHistory": "History is empty for now. Type a message or use the microphone.",
+      "loadingHistory": "Loading conversation…",
+      "thinking": "Okhana is thinking…",
+      "voiceInput": "Voice input",
+      "voiceUnsupported": "Voice input is not supported in this browser",
+      "placeholder": "Type or dictate a message",
+      "stopResponse": "Stop response",
+      "send": "Send",
+      "requestFailed": "Could not reach Okhana. Try again.",
+      "streamUnavailable": "Streaming is not available in this browser."
+    }
   }
 
 }

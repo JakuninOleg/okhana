@@ -6,6 +6,7 @@ import { db } from '@/lib/server/db';
 import { families, users } from '@/lib/server/db/schema';
 import { generateInviteCode } from '@/lib/server/utils';
 import { revalidatePath } from 'next/cache';
+import { invalidateDashboardFamilyCache } from '@/features/family/get-dashboard-family';
 
 /**
  * Creates a new family and sets the current user as its owner.
@@ -55,6 +56,7 @@ export async function createFamily(formData: FormData) {
     .set({ familyId: family.id, familyRole: 'owner' })
     .where(eq(users.clerkId, userId));
 
+  invalidateDashboardFamilyCache(userId);
   revalidatePath('/[locale]/dashboard', 'page');
 }
 
@@ -106,5 +108,6 @@ export async function joinFamily(formData: FormData) {
     .set({ familyId: family.id, familyRole: 'adult' })
     .where(eq(users.clerkId, userId));
 
+  invalidateDashboardFamilyCache(userId);
   revalidatePath('/[locale]/dashboard', 'page');
 }

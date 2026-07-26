@@ -3,11 +3,16 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // Mock auth() — returns userId or null
 const mockAuth = vi.hoisted(() => vi.fn());
 
-// Mock revalidatePath — a no-op, but assert it was called on success
+// Mock revalidatePath — no-op, asserted on success
 const mockRevalidatePath = vi.hoisted(() => vi.fn());
+const mockInvalidateDashboardFamilyCache = vi.hoisted(() => vi.fn());
 
 // Mock generateInviteCode — deterministic for happy-path assertions
 const mockGenerateInviteCode = vi.hoisted(() => vi.fn());
+
+vi.mock('@/features/family/get-dashboard-family', () => ({
+  invalidateDashboardFamilyCache: (...args: unknown[]) => mockInvalidateDashboardFamilyCache(...args),
+}));
 
 vi.mock('@/lib/server/db/schema', () => ({
   users: { id: 'id', clerkId: 'clerk_id', familyId: 'family_id', familyRole: 'family_role' },
@@ -134,6 +139,7 @@ describe('createFamily', () => {
     // User updated to owner
     expect(mockUpdateWhere).toHaveBeenCalledOnce();
     // Dashboard revalidated
+    expect(mockInvalidateDashboardFamilyCache).toHaveBeenCalledWith('user_1');
     expect(mockRevalidatePath).toHaveBeenCalledWith(
       '/[locale]/dashboard',
       'page',
@@ -203,6 +209,7 @@ describe('joinFamily', () => {
     await joinFamily(formData({ inviteCode: 'abcd2345' }));
 
     expect(mockUpdateWhere).toHaveBeenCalledOnce();
+    expect(mockInvalidateDashboardFamilyCache).toHaveBeenCalledWith('user_1');
     expect(mockRevalidatePath).toHaveBeenCalledWith(
       '/[locale]/dashboard',
       'page',

@@ -12,7 +12,6 @@ vi.mock('next-intl', () => ({
   },
 }));
 
-// Mock auth() — returns userId or null
 const mockAuth = vi.hoisted(() => vi.fn());
 vi.mock('@clerk/nextjs/server', () => ({
   auth: () => mockAuth(),
@@ -25,11 +24,6 @@ vi.mock('@clerk/nextjs/server', () => ({
   }),
 }));
 
-// Mock locale-aware redirect from @/i18n/navigation.
-// The real module pulls in next-intl/navigation which doesn't resolve in the
-// vitest Node environment, so we stub it and capture calls.
-// next-intl's redirect throws internally (like Next.js redirect) to halt
-// rendering, so the mock throws too.
 const mockRedirect = vi.hoisted(() => vi.fn((arg: unknown) => {
   void arg;
   throw new Error('NEXT_REDIRECT');
@@ -38,7 +32,6 @@ vi.mock('@/i18n/navigation', () => ({
   redirect: (arg: unknown) => mockRedirect(arg),
 }));
 
-// Mock next-intl/server translations
 vi.mock('next-intl/server', () => ({
   getTranslations: () =>
     Promise.resolve((key: string, vars?: Record<string, string>) => {
@@ -48,34 +41,13 @@ vi.mock('next-intl/server', () => ({
     }),
 }));
 
-// Mock db query — supports both the main query (select → from → leftJoin → where → limit)
-// and the members query (select → from → where).
-const mockDbSelect = vi.hoisted(() => vi.fn());
-const mockMembersDbSelect = vi.hoisted(() => vi.fn());
-const mockWhere = vi.hoisted(() => vi.fn(() => ({
-  limit: vi.fn(() => mockDbSelect()),
-})));
-const mockMembersWhere = vi.hoisted(() => vi.fn(() => mockMembersDbSelect()));
-vi.mock('@/lib/server/db', () => ({
-  db: {
-    select: vi.fn(() => ({
-      from: vi.fn(() => ({
-        leftJoin: vi.fn(() => ({
-          where: mockWhere,
-        })),
-        where: mockMembersWhere,
-      })),
-    })),
-  },
+const mockGetDashboardFamilyData = vi.hoisted(() => vi.fn());
+vi.mock('@/features/family/get-dashboard-family', () => ({
+  getDashboardFamilyData: (...args: unknown[]) => mockGetDashboardFamilyData(...args),
 }));
 
-vi.mock('@/lib/server/db/schema', () => ({
-  users: { email: 'email', clerkId: 'clerk_id', familyId: 'family_id', familyRole: 'family_role' },
-  families: { id: 'id', name: 'name', inviteCode: 'invite_code' },
-}));
-
-vi.mock('drizzle-orm', () => ({
-  eq: vi.fn(),
+vi.mock('@/features/chat/family-chat-loader', () => ({
+  FamilyChatLoader: () => React.createElement('div', null, 'Family chat'),
 }));
 
 vi.mock('@/features/family/invite-code-display', () => ({
@@ -111,15 +83,21 @@ function renderToString(element: React.ReactElement): string {
 describe('Dashboard page', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGetDashboardFamilyData.mockResolvedValue({
+      email: 'test@example.com',
+      familyName: null,
+      familyId: null,
+      inviteCode: null,
+      hasFamily: false,
+      members: [],
+      dbError: null,
+    });
   });
 
   it('renders greeting with user email from database', async () => {
     mockAuth.mockResolvedValue({ userId: 'user_123' });
-    mockDbSelect
-      .mockResolvedValueOnce([{ email: 'test@example.com', familyId: null, familyName: null, inviteCode: null }]);
 
     const { default: DashboardPage } = await import('./page');
-
     const result = await DashboardPage({
       params: Promise.resolve({ locale: 'en' }),
     }) as React.ReactElement;
@@ -130,11 +108,17 @@ describe('Dashboard page', () => {
 
   it('falls back to Clerk API when user not found in db', async () => {
     mockAuth.mockResolvedValue({ userId: 'user_123' });
-    mockDbSelect
-      .mockResolvedValueOnce([]);
+    mockGetDashboardFamilyData.mockResolvedValue({
+      email: '',
+      familyName: null,
+      familyId: null,
+      inviteCode: null,
+      hasFamily: false,
+      members: [],
+      dbError: null,
+    });
 
     const { default: DashboardPage } = await import('./page');
-
     const result = await DashboardPage({
       params: Promise.resolve({ locale: 'en' }),
     }) as React.ReactElement;
@@ -145,18 +129,22 @@ describe('Dashboard page', () => {
 
   it('shows the db error message when the query fails, without falling back silently', async () => {
     mockAuth.mockResolvedValue({ userId: 'user_123' });
-    mockDbSelect
-      .mockRejectedValueOnce(new Error('Connection refused'));
+    mockGetDashboardFamilyData.mockResolvedValue({
+      email: '',
+      familyName: null,
+      familyId: null,
+      inviteCode: null,
+      hasFamily: false,
+      members: [],
+      dbError: 'Connection refused',
+    });
 
     const { default: DashboardPage } = await import('./page');
-
     const result = await DashboardPage({
       params: Promise.resolve({ locale: 'en' }),
     }) as React.ReactElement;
 
     const html = renderToString(result);
-    // On DB failure the page surfaces the error instead of silently falling
-    // back — see src/app/[locale]/dashboard/page.tsx catch block.
     expect(html).toContain('Connection refused');
   });
 
@@ -165,9 +153,6 @@ describe('Dashboard page', () => {
 
     const { default: DashboardPage } = await import('./page');
 
-    // redirect() throws to halt rendering (mirrors next-intl behaviour),
-    // so the page rejects. We assert the redirect was invoked with the
-    // expected locale-aware target.
     await expect(
       DashboardPage({ params: Promise.resolve({ locale: 'en' }) }),
     ).rejects.toThrow('NEXT_REDIRECT');
@@ -175,26 +160,24 @@ describe('Dashboard page', () => {
     expect(mockRedirect).toHaveBeenCalledWith({ href: '/', locale: 'en' });
   });
 
-  it('does not crash when the members query fails (defence-in-depth)', async () => {
-    // Regression: the members select was unguarded — a connection drop there
-    // crashed the entire Server Component render in production, surfacing as
-    // a generic "An error occurred in the Server Components render".
+  it('does not crash when members are empty after a partial family load', async () => {
     mockAuth.mockResolvedValue({ userId: 'user_123' });
-    mockDbSelect.mockResolvedValueOnce([
-      { email: 'test@example.com', familyId: 7, familyName: 'Smiths', inviteCode: 'ABCD2345' },
-    ]);
-    mockMembersDbSelect.mockRejectedValueOnce(new Error('Connection lost'));
+    mockGetDashboardFamilyData.mockResolvedValue({
+      email: 'test@example.com',
+      familyName: 'Smiths',
+      familyId: 7,
+      inviteCode: 'ABCD2345',
+      hasFamily: true,
+      members: [],
+      dbError: null,
+    });
 
     const { default: DashboardPage } = await import('./page');
-
-    // Should resolve, not reject — the error is caught and logged.
     const result = await DashboardPage({
       params: Promise.resolve({ locale: 'en' }),
     }) as React.ReactElement;
 
     const html = renderToString(result);
-    // Family info block renders (invite code shown) — the members query
-    // failure was caught and did not crash the page.
     expect(html).toContain('ABCD2345');
     expect(html).toContain('familyInfo');
   });
