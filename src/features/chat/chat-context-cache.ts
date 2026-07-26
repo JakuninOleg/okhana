@@ -21,6 +21,7 @@ type GlobalChatCache = typeof globalThis & {
 };
 
 const TTL_MS = 10 * 60_000;
+const MAX_ENTRIES = 500;
 
 function cacheMap(): Map<string, CachedChatContext> {
   const globalCache = globalThis as GlobalChatCache;
@@ -30,7 +31,33 @@ function cacheMap(): Map<string, CachedChatContext> {
   return globalCache.__okhanaChatContextCache;
 }
 
+function pruneExpired(now = Date.now()): void {
+  const map = cacheMap();
+  for (const [key, value] of map) {
+    if (now - value.cachedAt > TTL_MS) {
+      map.delete(key);
+    }
+  }
+}
+
+function enforceBound(): void {
+  const map = cacheMap();
+  if (map.size <= MAX_ENTRIES) {
+    return;
+  }
+  const overflow = map.size - MAX_ENTRIES;
+  let removed = 0;
+  for (const key of map.keys()) {
+    map.delete(key);
+    removed += 1;
+    if (removed >= overflow) {
+      break;
+    }
+  }
+}
+
 export function getCachedChatContext(clerkUserId: string): CachedChatContext | null {
+  pruneExpired();
   const hit = cacheMap().get(clerkUserId);
   if (!hit) {
     return null;
@@ -46,5 +73,7 @@ export function setCachedChatContext(
   clerkUserId: string,
   context: Omit<CachedChatContext, 'cachedAt'>,
 ): void {
+  pruneExpired();
   cacheMap().set(clerkUserId, { ...context, cachedAt: Date.now() });
+  enforceBound();
 }

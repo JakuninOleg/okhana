@@ -105,9 +105,9 @@ export function accumulateToolCallDeltas(
 export function toolCallsFromAccumulator(store: Map<number, ToolCallAccumulator>): GoAiToolCall[] {
   return [...store.entries()]
     .sort(([left], [right]) => left - right)
-    .map(([, value]) => {
+    .map(([index, value]) => {
       const call: GoAiToolCall = {
-        id: value.id || `call_${value.name || 'tool'}`,
+        id: value.id || `call_${value.name || 'tool'}_${index}`,
         type: 'function',
         function: {
           name: value.name,
@@ -139,44 +139,58 @@ export async function assembleOpenAiSseStream(
   let finishReason: string | null = null;
   const toolCallStore = new Map<number, ToolCallAccumulator>();
 
+  function consumeEventBlock(event: string): void {
+    const lines = event.split('\n');
+    for (const line of lines) {
+      if (!line.startsWith('data:')) {
+        continue;
+      }
+      const data = line.slice('data:'.length).trim();
+      if (data === '[DONE]') {
+        continue;
+      }
+
+      const parsed = parseOpenAiSseData(data);
+      if (!parsed) {
+        continue;
+      }
+
+      if (parsed.contentDelta) {
+        content += parsed.contentDelta;
+        options?.onContentDelta?.(parsed.contentDelta);
+      }
+      if (parsed.toolCallDeltas.length > 0) {
+        accumulateToolCallDeltas(toolCallStore, parsed.toolCallDeltas);
+      }
+      if (parsed.finishReason) {
+        finishReason = parsed.finishReason;
+      }
+    }
+  }
+
+  function consumeBufferChunk(chunk: string, flushTail: boolean): void {
+    buffer += chunk.replace(/\r\n/g, '\n');
+    const events = buffer.split('\n\n');
+    if (flushTail) {
+      buffer = '';
+    } else {
+      buffer = events.pop() ?? '';
+    }
+    for (const event of events) {
+      if (event.trim().length === 0) {
+        continue;
+      }
+      consumeEventBlock(event);
+    }
+  }
+
   while (true) {
     const { done, value } = await reader.read();
     if (done) {
+      consumeBufferChunk(decoder.decode(), true);
       break;
     }
-
-    buffer += decoder.decode(value, { stream: true });
-    const events = buffer.split('\n\n');
-    buffer = events.pop() ?? '';
-
-    for (const event of events) {
-      const lines = event.split('\n');
-      for (const line of lines) {
-        if (!line.startsWith('data:')) {
-          continue;
-        }
-        const data = line.slice('data:'.length).trim();
-        if (data === '[DONE]') {
-          continue;
-        }
-
-        const parsed = parseOpenAiSseData(data);
-        if (!parsed) {
-          continue;
-        }
-
-        if (parsed.contentDelta) {
-          content += parsed.contentDelta;
-          options?.onContentDelta?.(parsed.contentDelta);
-        }
-        if (parsed.toolCallDeltas.length > 0) {
-          accumulateToolCallDeltas(toolCallStore, parsed.toolCallDeltas);
-        }
-        if (parsed.finishReason) {
-          finishReason = parsed.finishReason;
-        }
-      }
-    }
+    consumeBufferChunk(decoder.decode(value, { stream: true }), false);
   }
 
   return {

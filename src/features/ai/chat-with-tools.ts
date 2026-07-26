@@ -100,11 +100,20 @@ export function createChatWithToolsStream(input: ChatWithToolsInput): Response {
               ];
               continue;
             }
-            const toolResult = await executeAiTool(
-              input.toolContext,
-              toolCall.function.name,
-              toolCall.function.arguments,
-            );
+            let toolResult: unknown;
+            try {
+              toolResult = await executeAiTool(
+                input.toolContext,
+                toolCall.function.name,
+                toolCall.function.arguments,
+              );
+            } catch (toolError) {
+              console.error('AI tool execution failed', {
+                name: toolError instanceof Error ? toolError.name : 'Error',
+                message: toolError instanceof Error ? toolError.message.slice(0, 120) : 'unknown',
+              });
+              toolResult = { error: 'Tool execution failed.' };
+            }
             workingMessages = [
               ...workingMessages,
               {
@@ -119,18 +128,25 @@ export function createChatWithToolsStream(input: ChatWithToolsInput): Response {
         if (input.signal?.aborted) {
           return;
         }
+        console.error('chat-with-tools unexpected failure', {
+          name: error instanceof Error ? error.name : 'Error',
+          message: error instanceof Error ? error.message.slice(0, 120) : 'unknown',
+        });
         const message = 'Something went wrong while contacting the assistant.';
-        controller.enqueue(encodeOpenAiContentDelta(message));
+        if (!input.signal?.aborted) {
+          controller.enqueue(encodeOpenAiContentDelta(message));
+        }
         finalText = message;
-        void error;
       } finally {
         try {
           await input.onComplete?.({ text: finalText });
         } catch {
           // Persistence failures must not break an already-streamed reply.
         }
-        controller.enqueue(encodeOpenAiDone());
-        controller.close();
+        if (!input.signal?.aborted) {
+          controller.enqueue(encodeOpenAiDone());
+          controller.close();
+        }
       }
     },
   });

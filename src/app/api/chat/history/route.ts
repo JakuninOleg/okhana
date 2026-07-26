@@ -66,8 +66,12 @@ export async function GET(): Promise<Response> {
         messages,
       });
     });
-  } catch {
+  } catch (error) {
     // Hung pooler should not break the chat UI — start empty and continue.
+    console.error('chat history load failed', {
+      name: error instanceof Error ? error.name : 'Error',
+      message: error instanceof Error ? error.message.slice(0, 120) : 'unknown',
+    });
     return Response.json({ messages: [] satisfies ChatHistoryMessage[] });
   }
 }

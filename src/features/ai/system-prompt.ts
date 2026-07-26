@@ -25,6 +25,6 @@ export function buildSystemPrompt(input: {
     'Use search_notes before saying you do not know, when the answer may depend on saved family notes.',
     'If a note privacy level or hidden-from list is ambiguous, ask a short clarification before saving sensitive information.',
     'Never claim to see private notes that are not returned by search_notes; note search results are already filtered by database permissions.',
-    `Current user role: ${input.familyRole}. Family members: ${input.familyMembers.map((member) => `${member.id}:${member.name ?? member.email}(${member.role ?? 'unknown'})`).join(', ')}.`,
+    `Current user role: ${input.familyRole}. Family members: ${input.familyMembers.map((member) => `${member.id}:${member.name ?? `member-${member.id}`}(${member.role ?? 'unknown'})`).join(', ')}.`,
   ].join('\n');
 }

@@ -23,7 +23,7 @@ const MAX_MESSAGE_CHARS = 8_000;
 const MAX_STORED_MESSAGE_CHARS = 12_000;
 
 const chatMessageSchema = z.object({
-  role: z.enum(['user', 'assistant', 'system']),
+  role: z.enum(['user', 'assistant']),
   content: z.string().min(1).max(MAX_MESSAGE_CHARS),
 });
 
@@ -187,7 +187,14 @@ export async function POST(request: Request): Promise<Response> {
     throw error;
   }
 
-  const parsedBody = chatRequestSchema.safeParse(await request.json());
+  let rawBody: unknown;
+  try {
+    rawBody = await request.json();
+  } catch {
+    return Response.json({ error: 'Invalid chat payload' }, { status: 400 });
+  }
+
+  const parsedBody = chatRequestSchema.safeParse(rawBody);
   if (!parsedBody.success) {
     return Response.json({ error: 'Invalid chat payload' }, { status: 400 });
   }

@@ -15,6 +15,10 @@ const speechRequestSchema = z.object({
   locale: z.enum(routing.locales),
 });
 
+function clientStatusFromUpstream(status: number): number {
+  return status === 401 || status === 403 ? 502 : status;
+}
+
 /**
  * Browser → Okhana → Go-Ai TTS. Explicit opt-in only — never auto-speak unless
  * the EN UI toggle is on. Hard RU policy: no TTS for `ru` UI (no Russian model).
@@ -34,7 +38,14 @@ export async function POST(request: Request): Promise<Response> {
     throw error;
   }
 
-  const parsed = speechRequestSchema.safeParse(await request.json());
+  let rawBody: unknown;
+  try {
+    rawBody = await request.json();
+  } catch {
+    return Response.json({ error: 'Invalid speech payload' }, { status: 400 });
+  }
+
+  const parsed = speechRequestSchema.safeParse(rawBody);
   if (!parsed.success) {
     return Response.json({ error: 'Invalid speech payload' }, { status: 400 });
   }
@@ -64,7 +75,10 @@ export async function POST(request: Request): Promise<Response> {
 
   if (!upstream.ok) {
     const safe = await readGoAiSafeError(upstream);
-    return Response.json({ error: safe.message }, { status: safe.status });
+    return Response.json(
+      { error: safe.message },
+      { status: clientStatusFromUpstream(safe.status) },
+    );
   }
 
   if (!upstream.body) {

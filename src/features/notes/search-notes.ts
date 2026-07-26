@@ -1,4 +1,4 @@
-import { and, arrayContains, eq, ilike, isNull, ne, not, or } from 'drizzle-orm';
+import { and, arrayContains, desc, eq, isNull, ne, not, or, sql } from 'drizzle-orm';
 import { db } from '@/lib/server/db';
 import { withDbRetry } from '@/lib/server/db/client';
 import { notes } from '@/lib/server/db/schema';
@@ -22,9 +22,17 @@ export type SearchNoteResult = {
   createdAt: Date;
 };
 
+function escapeLikeMetacharacters(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
+}
+
 export async function searchNotes(input: SearchNotesInput): Promise<SearchNoteResult[]> {
   const trimmedQuery = input.query.trim();
-  const queryPattern = `%${trimmedQuery}%`;
+  if (!trimmedQuery) {
+    return [];
+  }
+
+  const queryPattern = `%${escapeLikeMetacharacters(trimmedQuery)}%`;
   const maxResults = Math.min(Math.max(input.limit ?? 5, 1), 10);
 
   return withDbRetry(async () => db
@@ -40,11 +48,15 @@ export async function searchNotes(input: SearchNotesInput): Promise<SearchNoteRe
     .where(
       and(
         eq(notes.familyId, input.familyId),
-        or(ilike(notes.title, queryPattern), ilike(notes.content, queryPattern)),
+        or(
+          sql`${notes.title} ILIKE ${queryPattern} ESCAPE '\\'`,
+          sql`${notes.content} ILIKE ${queryPattern} ESCAPE '\\'`,
+        ),
         input.familyRole === 'child' ? ne(notes.privacyLevel, 'adults_only') : undefined,
         or(ne(notes.privacyLevel, 'personal'), eq(notes.createdBy, input.userId)),
         or(isNull(notes.hiddenFrom), not(arrayContains(notes.hiddenFrom, [input.userId]))),
       ),
     )
+    .orderBy(desc(notes.createdAt))
     .limit(maxResults));
 }

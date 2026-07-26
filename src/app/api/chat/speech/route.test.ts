@@ -6,7 +6,13 @@ const mockGoAiAudioSpeech = vi.hoisted(() =>
   vi.fn(async (_options: unknown): Promise<Response> => new Response()),
 );
 const mockReadGoAiSafeError = vi.hoisted(() =>
-  vi.fn(async (_response: unknown) => ({ status: 502, message: 'upstream', code: null })),
+  vi.fn(
+    async (_response: unknown): Promise<{ status: number; message: string; code: string | null }> => ({
+      status: 502,
+      message: 'upstream',
+      code: null,
+    }),
+  ),
 );
 
 vi.mock('@clerk/nextjs/server', () => ({
@@ -85,6 +91,32 @@ describe('POST /api/chat/speech', () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get('Content-Type')).toBe('audio/wav');
+    expect(mockGoAiAudioSpeech).toHaveBeenCalledOnce();
+  });
+
+  it('maps gateway auth failures to 502 for the browser', async () => {
+    mockGoAiAudioSpeech.mockResolvedValue(
+      Response.json({ error: { message: 'unauthorized', code: 'auth_error' } }, { status: 401 }),
+    );
+    mockReadGoAiSafeError.mockResolvedValue({
+      status: 401,
+      message: 'The model gateway rejected authentication. Check GO_AI_SHARED_SECRET.',
+      code: 'auth_error',
+    });
+
+    const { POST } = await import('@/app/api/chat/speech/route');
+    const response = await POST(
+      new Request('http://localhost/api/chat/speech', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          locale: 'en',
+          text: 'You still have milk on the grocery list today.',
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(502);
     expect(mockGoAiAudioSpeech).toHaveBeenCalledOnce();
   });
 });

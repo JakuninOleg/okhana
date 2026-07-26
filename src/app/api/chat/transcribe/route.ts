@@ -4,6 +4,12 @@ import { goAiAudioTranscriptions, getGoAiConfig, readGoAiSafeError } from '@/fea
 export const runtime = 'nodejs';
 
 const STT_MODEL = 'whisper-large-v3-turbo';
+/** Align with Go-Ai default GROQ_STT_MAX_REQUEST_BYTES. */
+const MAX_AUDIO_UPLOAD_BYTES = 25_000_000;
+
+function clientStatusFromUpstream(status: number): number {
+  return status === 401 || status === 403 ? 502 : status;
+}
 
 /**
  * Browser → Okhana → Go-Ai STT. Never expose the gateway secret to the client.
@@ -29,10 +35,27 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ error: 'Expected multipart audio upload' }, { status: 415 });
   }
 
-  const incoming = await request.formData();
+  const declaredLength = request.headers.get('content-length');
+  if (declaredLength) {
+    const bytes = Number(declaredLength);
+    if (Number.isFinite(bytes) && bytes > MAX_AUDIO_UPLOAD_BYTES) {
+      return Response.json({ error: 'Audio upload is too large' }, { status: 413 });
+    }
+  }
+
+  let incoming: FormData;
+  try {
+    incoming = await request.formData();
+  } catch {
+    return Response.json({ error: 'Malformed multipart audio upload' }, { status: 400 });
+  }
+
   const file = incoming.get('file');
   if (!(file instanceof File) || file.size === 0) {
     return Response.json({ error: 'Audio file is required' }, { status: 400 });
+  }
+  if (file.size > MAX_AUDIO_UPLOAD_BYTES) {
+    return Response.json({ error: 'Audio upload is too large' }, { status: 413 });
   }
 
   const language = incoming.get('language');
@@ -43,6 +66,7 @@ export async function POST(request: Request): Promise<Response> {
     outbound.append('language', language);
   }
 
+  // Intentionally buffer once so Go-Ai receives a real Content-Length header.
   const encoded = new Request('http://localhost/transcribe', {
     method: 'POST',
     body: outbound,
@@ -52,6 +76,9 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ error: 'Failed to encode audio upload' }, { status: 500 });
   }
   const bodyBuffer = Buffer.from(await encoded.arrayBuffer());
+  if (bodyBuffer.byteLength > MAX_AUDIO_UPLOAD_BYTES) {
+    return Response.json({ error: 'Audio upload is too large' }, { status: 413 });
+  }
 
   const upstream = await goAiAudioTranscriptions({
     body: bodyBuffer,
@@ -62,10 +89,18 @@ export async function POST(request: Request): Promise<Response> {
 
   if (!upstream.ok) {
     const safe = await readGoAiSafeError(upstream);
-    return Response.json({ error: safe.message }, { status: safe.status });
+    return Response.json(
+      { error: safe.message },
+      { status: clientStatusFromUpstream(safe.status) },
+    );
   }
 
-  const payload = (await upstream.json()) as { text?: unknown };
+  let payload: { text?: unknown } = {};
+  try {
+    payload = (await upstream.json()) as { text?: unknown };
+  } catch {
+    return Response.json({ error: 'Transcription returned no text' }, { status: 502 });
+  }
   const text = typeof payload.text === 'string' ? payload.text.trim() : '';
   if (!text) {
     return Response.json({ error: 'Transcription returned no text' }, { status: 502 });

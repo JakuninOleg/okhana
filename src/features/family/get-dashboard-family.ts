@@ -1,6 +1,6 @@
 import { cache } from 'react';
 import { eq } from 'drizzle-orm';
-import { setCachedChatContext } from '@/features/chat/chat-context-cache';
+import { getCachedChatContext, setCachedChatContext } from '@/features/chat/chat-context-cache';
 import { db } from '@/lib/server/db';
 import { withDbRetry } from '@/lib/server/db/client';
 import { families, users } from '@/lib/server/db/schema';
@@ -72,13 +72,15 @@ async function queryDashboardFamily(clerkUserId: string): Promise<DashboardFamil
       : [];
 
     // Warm chat cache so the first message does not wait on Postgres.
+    // Preserve an existing conversation session if the cache already has one.
     if (result?.userId && familyId && result.familyRole) {
+      const existing = getCachedChatContext(clerkUserId);
       setCachedChatContext(clerkUserId, {
         familyId,
         userId: result.userId,
         familyRole: result.familyRole,
-        conversationId: null,
-        isNewConversation: true,
+        conversationId: existing?.conversationId ?? null,
+        isNewConversation: existing?.isNewConversation ?? true,
         familyMembers: members.map((member) => ({
           id: member.id,
           name: member.name,
@@ -118,6 +120,10 @@ export const getDashboardFamilyData = cache(async (clerkUserId: string): Promise
     familyCache().set(clerkUserId, { at: Date.now(), data });
     return data;
   } catch (error) {
+    console.error('dashboard family load failed', {
+      name: error instanceof Error ? error.name : 'Error',
+      message: error instanceof Error ? error.message.slice(0, 120) : 'unknown',
+    });
     return {
       email: '',
       familyName: null,
@@ -125,7 +131,7 @@ export const getDashboardFamilyData = cache(async (clerkUserId: string): Promise
       inviteCode: null,
       hasFamily: false,
       members: [],
-      dbError: error instanceof Error ? error.message : 'Database connection failed',
+      dbError: 'Database temporarily unavailable. Try again shortly.',
     };
   }
 });

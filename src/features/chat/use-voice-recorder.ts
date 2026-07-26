@@ -65,15 +65,19 @@ export function useVoiceRecorder(options: UseVoiceRecorderOptions): UseVoiceReco
   const hardStopRef = useRef<number | null>(null);
   const uploadingRef = useRef(false);
   const pressingRef = useRef(false);
+  const startingRef = useRef(false);
+  const uploadControllerRef = useRef<AbortController | null>(null);
   const optionsRef = useRef(options);
   optionsRef.current = options;
 
   useEffect(() => {
     return () => {
+      uploadControllerRef.current?.abort();
       clearTimers();
       stopTracks();
       mediaRecorderRef.current = null;
       pressingRef.current = false;
+      startingRef.current = false;
     };
   }, []);
 
@@ -105,6 +109,8 @@ export function useVoiceRecorder(options: UseVoiceRecorderOptions): UseVoiceReco
     }
     uploadingRef.current = true;
     setPhase('transcribing');
+    const controller = new AbortController();
+    uploadControllerRef.current = controller;
 
     try {
       const formData = new FormData();
@@ -117,6 +123,7 @@ export function useVoiceRecorder(options: UseVoiceRecorderOptions): UseVoiceReco
       const response = await fetch('/api/chat/transcribe', {
         method: 'POST',
         body: formData,
+        signal: controller.signal,
       });
       const payload = (await response.json().catch(() => null)) as { text?: string; error?: string } | null;
       if (!response.ok) {
@@ -126,10 +133,18 @@ export function useVoiceRecorder(options: UseVoiceRecorderOptions): UseVoiceReco
       if (!text) {
         throw new Error('Transcription returned no text');
       }
-      optionsRef.current.onTranscript(text);
+      if (!controller.signal.aborted) {
+        optionsRef.current.onTranscript(text);
+      }
     } catch (error) {
+      if (controller.signal.aborted) {
+        return;
+      }
       optionsRef.current.onError(error instanceof Error ? error.message : 'Transcription failed');
     } finally {
+      if (uploadControllerRef.current === controller) {
+        uploadControllerRef.current = null;
+      }
       uploadingRef.current = false;
       setPhase('idle');
       setElapsedMs(0);
@@ -147,20 +162,21 @@ export function useVoiceRecorder(options: UseVoiceRecorderOptions): UseVoiceReco
   }
 
   async function startRecording(): Promise<void> {
-    if (optionsRef.current.disabled || !supported) {
-      return;
-    }
-    if (phase !== 'idle' && phase !== 'transcribing') {
-      return;
-    }
-    if (mediaRecorderRef.current || uploadingRef.current) {
+    if (
+      optionsRef.current.disabled
+      || !supported
+      || startingRef.current
+      || mediaRecorderRef.current
+      || uploadingRef.current
+    ) {
       return;
     }
 
+    startingRef.current = true;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      // User may have released before permission resolved.
-      if (!pressingRef.current) {
+      // User may have released before permission resolved, or another start won.
+      if (!pressingRef.current || mediaRecorderRef.current) {
         stream.getTracks().forEach((track) => track.stop());
         return;
       }
@@ -215,11 +231,13 @@ export function useVoiceRecorder(options: UseVoiceRecorderOptions): UseVoiceReco
       stopTracks();
       setPhase('idle');
       optionsRef.current.onError('Microphone permission is required');
+    } finally {
+      startingRef.current = false;
     }
   }
 
   function pressStart(): void {
-    if (optionsRef.current.disabled || !supported || uploadingRef.current) {
+    if (optionsRef.current.disabled || !supported || uploadingRef.current || startingRef.current) {
       return;
     }
     pressingRef.current = true;
@@ -238,6 +256,7 @@ export function useVoiceRecorder(options: UseVoiceRecorderOptions): UseVoiceReco
 
   function stop(): void {
     pressingRef.current = false;
+    uploadControllerRef.current?.abort();
     if (phase === 'recording' || phase === 'warning' || mediaRecorderRef.current) {
       finalizeRecorder();
     }

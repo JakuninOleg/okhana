@@ -420,6 +420,23 @@ export function FamilyChat(): React.JSX.Element {
                         voice.pressEnd();
                       }
                     }}
+                    onKeyDown={(event) => {
+                      if (event.key !== ' ' && event.key !== 'Enter') {
+                        return;
+                      }
+                      if (event.repeat) {
+                        return;
+                      }
+                      event.preventDefault();
+                      voice.pressStart();
+                    }}
+                    onKeyUp={(event) => {
+                      if (event.key !== ' ' && event.key !== 'Enter') {
+                        return;
+                      }
+                      event.preventDefault();
+                      voice.pressEnd();
+                    }}
                     onContextMenu={(event) => event.preventDefault()}
                     aria-label={t('voiceInput')}
                     className="shrink-0 touch-none rounded-xl select-none"

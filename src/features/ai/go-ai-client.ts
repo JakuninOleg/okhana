@@ -57,8 +57,9 @@ export type GoAiAudioTranscriptionsOptions = {
 };
 
 /**
- * Proxy STT to Go-Ai. Preserves multipart Content-Type and Content-Length;
- * do not invent length by buffering the full upload.
+ * Proxy STT to Go-Ai. Callers must provide Content-Type and Content-Length.
+ * Okhana's /api/chat/transcribe route intentionally buffers once to compute length
+ * because Go-Ai requires Content-Length on transcription uploads.
  */
 export async function goAiAudioTranscriptions(
   options: GoAiAudioTranscriptionsOptions,

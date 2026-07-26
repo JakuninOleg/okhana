@@ -5,6 +5,9 @@ const CHANGE_EVENT = 'okhana-tts-pref';
 /** Legacy unscoped key from the first TTS toggle — only applied to `en`. */
 const LEGACY_TTS_PREF_KEY = 'okhana.ttsEnabled.v1';
 
+/** Used when localStorage is unavailable (private mode / quota). */
+let memoryFallback: boolean | null = null;
+
 function prefKey(locale: Locale): string {
   return `${TTS_PREF_PREFIX}${locale}`;
 }
@@ -17,6 +20,7 @@ function readRaw(locale: Locale): boolean {
   try {
     const scoped = window.localStorage.getItem(prefKey('en'));
     if (scoped === 'true' || scoped === 'false') {
+      memoryFallback = scoped === 'true';
       return scoped === 'true';
     }
 
@@ -25,13 +29,14 @@ function readRaw(locale: Locale): boolean {
     if (legacy === 'true' || legacy === 'false') {
       window.localStorage.setItem(prefKey('en'), legacy);
       window.localStorage.removeItem(LEGACY_TTS_PREF_KEY);
+      memoryFallback = legacy === 'true';
       return legacy === 'true';
     }
   } catch {
-    return false;
+    return memoryFallback ?? false;
   }
 
-  return false;
+  return memoryFallback ?? false;
 }
 
 /** TTS preference is EN-only. RU always reads as off (no TTS UI / no auto-speak). */
@@ -75,6 +80,7 @@ export function setTtsEnabled(enabled: boolean, locale: Locale = 'en'): void {
   if (typeof window === 'undefined' || locale !== 'en') {
     return;
   }
+  memoryFallback = enabled;
   try {
     window.localStorage.setItem(prefKey('en'), enabled ? 'true' : 'false');
     window.localStorage.removeItem(LEGACY_TTS_PREF_KEY);
