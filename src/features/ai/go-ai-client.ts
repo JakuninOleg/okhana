@@ -136,6 +136,14 @@ export async function readGoAiSafeError(response: Response): Promise<GoAiSafeErr
       typeof payload.error?.message === 'string' ? payload.error.message.trim() : '';
 
     // Only forward short, non-sensitive gateway codes/messages we already know are safe.
+    if (code === 'model_terms_required') {
+      return {
+        status: response.status,
+        code,
+        message:
+          'Groq requires accepting Orpheus TTS model terms in the console before speech works.',
+      };
+    }
     if (code === 'provider_error' || type === 'server_error') {
       return {
         status: response.status,

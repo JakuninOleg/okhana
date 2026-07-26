@@ -1,9 +1,8 @@
 'use client';
 
-import { Loader2, Mic, Send, Square } from 'lucide-react';
+import { Loader2, Mic, Send, Square, Volume2 } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
-import { useEffect, useRef, useState, useEffectEvent } from 'react';
-import { useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState, useEffectEvent, useSyncExternalStore } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -14,6 +13,8 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Tooltip,
@@ -21,6 +22,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { isConfidentlyEnglish } from '@/features/ai/english-guard';
 import { ChatMessage } from '@/features/chat/chat-message';
 import type { FamilyChatMessage } from '@/features/chat/family-chat-storage';
 import {
@@ -32,7 +34,14 @@ import {
   updateFamilyChatMessages,
 } from '@/features/chat/family-chat-store';
 import { OkhanaAvatar } from '@/features/chat/okhana-avatar';
+import { playChatSpeech } from '@/features/chat/play-chat-speech';
 import { readOpenAiChatStream } from '@/features/chat/read-openai-stream';
+import {
+  getServerTtsEnabledSnapshot,
+  getTtsEnabledSnapshot,
+  setTtsEnabled,
+  subscribeTtsEnabled,
+} from '@/features/chat/tts-preference';
 import { useVoiceRecorder } from '@/features/chat/use-voice-recorder';
 import type { Locale } from '@/i18n/routing';
 import { cn } from '@/lib/utils';
@@ -65,18 +74,30 @@ export function FamilyChat(): React.JSX.Element {
     getFamilyChatSnapshot,
     getServerFamilyChatSnapshot,
   );
+  const ttsEnabled = useSyncExternalStore(
+    subscribeTtsEnabled,
+    () => getTtsEnabledSnapshot(locale),
+    getServerTtsEnabledSnapshot,
+  );
   const { messages, input } = chat;
   const [status, setStatus] = useState<ChatStatus>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const speechAbortRef = useRef<AbortController | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
+  const statusRef = useRef(status);
+  statusRef.current = status;
+
+  const submitFromVoice = useEffectEvent((text: string) => {
+    void submitMessage(text);
+  });
 
   const voice = useVoiceRecorder({
     language: sttLanguageByLocale[locale],
     disabled: status === 'streaming',
     onTranscript: (text) => {
-      updateFamilyChatInput(text);
       setErrorMessage(null);
+      submitFromVoice(text);
     },
     onError: (message) => {
       setErrorMessage(message);
@@ -142,13 +163,35 @@ export function FamilyChat(): React.JSX.Element {
   useEffect(() => {
     return () => {
       abortRef.current?.abort();
+      speechAbortRef.current?.abort();
       voice.stop();
     };
   }, []);
 
-  async function submitMessage(): Promise<void> {
-    const text = input.trim();
-    if (!text || status === 'streaming') {
+  async function maybeSpeakAssistant(text: string): Promise<void> {
+    if (locale !== 'en' || !getTtsEnabledSnapshot('en') || !isConfidentlyEnglish(text)) {
+      return;
+    }
+
+    speechAbortRef.current?.abort();
+    const controller = new AbortController();
+    speechAbortRef.current = controller;
+
+    const result = await playChatSpeech({
+      text,
+      locale: 'en',
+      signal: controller.signal,
+    });
+
+    if (!result.ok && !controller.signal.aborted) {
+      setErrorMessage(result.error);
+    }
+  }
+
+  async function submitMessage(overrideText?: string): Promise<void> {
+    const snapshot = getFamilyChatSnapshot();
+    const text = (overrideText ?? snapshot.input).trim();
+    if (!text || statusRef.current === 'streaming') {
       return;
     }
 
@@ -162,7 +205,7 @@ export function FamilyChat(): React.JSX.Element {
       content: text,
     };
     const assistantId = createLocalId('assistant');
-    const nextMessages = [...messages, userMessage];
+    const nextMessages = [...snapshot.messages, userMessage];
     replaceFamilyChatSnapshot({
       messages: [...nextMessages, { id: assistantId, role: 'assistant', content: '' }],
       input: '',
@@ -209,6 +252,10 @@ export function FamilyChat(): React.JSX.Element {
       );
 
       setStatus('idle');
+      const assistantText = getFamilyChatSnapshot().messages.find(
+        (message) => message.id === assistantId,
+      )?.content ?? '';
+      void maybeSpeakAssistant(assistantText);
     } catch (error) {
       if (controller.signal.aborted) {
         setStatus('idle');
@@ -229,12 +276,12 @@ export function FamilyChat(): React.JSX.Element {
   function stopStreaming(): void {
     abortRef.current?.abort();
     abortRef.current = null;
+    speechAbortRef.current?.abort();
     setStatus('idle');
   }
 
   const busy = status === 'streaming' || voice.phase === 'transcribing';
   const recording = voice.phase === 'recording' || voice.phase === 'warning';
-  const ttsEnabled = locale === 'en';
 
   const statusLine =
     voice.phase === 'transcribing'
@@ -256,11 +303,29 @@ export function FamilyChat(): React.JSX.Element {
           <div className="flex items-start gap-3">
             <OkhanaAvatar size="lg" label={t('assistantName')} />
             <div className="min-w-0 flex-1 space-y-1">
-              <p className="text-[0.7rem] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-                {t('eyebrow')}
-              </p>
-              <CardTitle className="text-xl tracking-tight">{t('title')}</CardTitle>
-              <CardDescription>{t('description')}</CardDescription>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 space-y-1">
+                  <p className="text-[0.7rem] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                    {t('eyebrow')}
+                  </p>
+                  <CardTitle className="text-xl tracking-tight">{t('title')}</CardTitle>
+                  <CardDescription>{t('description')}</CardDescription>
+                </div>
+                {locale === 'en' ? (
+                  <div className="flex shrink-0 items-center gap-2 rounded-xl border border-border/60 bg-muted/30 px-2.5 py-1.5">
+                    <Volume2 className="size-3.5 text-muted-foreground" aria-hidden />
+                    <Label htmlFor="okhana-tts-toggle" className="text-xs text-muted-foreground">
+                      {t('ttsToggle')}
+                    </Label>
+                    <Switch
+                      id="okhana-tts-toggle"
+                      checked={ttsEnabled}
+                      onCheckedChange={(checked) => setTtsEnabled(checked, 'en')}
+                      aria-label={t('ttsToggle')}
+                    />
+                  </div>
+                ) : null}
+              </div>
               <div className="flex flex-wrap items-center gap-2 pt-1">
                 <p className="text-xs text-muted-foreground" aria-live="polite">
                   {statusLine}
@@ -269,6 +334,9 @@ export function FamilyChat(): React.JSX.Element {
                   <Badge variant={voice.phase === 'warning' ? 'destructive' : 'secondary'}>
                     {formatElapsed(voice.elapsedMs)}
                   </Badge>
+                ) : null}
+                {locale === 'en' && ttsEnabled ? (
+                  <Badge variant="outline">{t('ttsOnHint')}</Badge>
                 ) : null}
               </div>
             </div>
@@ -303,11 +371,6 @@ export function FamilyChat(): React.JSX.Element {
                   isStreaming={status === 'streaming'}
                   assistantName={t('assistantName')}
                   thinkingLabel={t('thinking')}
-                  speakLabel={t('speak')}
-                  speakingLabel={t('speaking')}
-                  speakUnavailableLabel={t('speakUnavailable')}
-                  locale={locale}
-                  ttsEnabled={ttsEnabled}
                 />
               ))
             )}
@@ -336,20 +399,30 @@ export function FamilyChat(): React.JSX.Element {
                     variant={recording ? 'destructive' : 'ghost'}
                     size="icon"
                     disabled={!voice.supported || busy}
-                    onClick={voice.toggle}
+                    onPointerDown={(event) => {
+                      if (event.button !== 0) {
+                        return;
+                      }
+                      event.preventDefault();
+                      voice.pressStart();
+                    }}
+                    onPointerUp={() => voice.pressEnd()}
+                    onPointerCancel={() => voice.pressEnd()}
+                    onPointerLeave={() => {
+                      if (recording) {
+                        voice.pressEnd();
+                      }
+                    }}
+                    onContextMenu={(event) => event.preventDefault()}
                     aria-label={t('voiceInput')}
-                    className="shrink-0 rounded-xl"
+                    className="shrink-0 touch-none rounded-xl select-none"
                   />
                 }
               >
                 {voice.phase === 'transcribing' ? <Loader2 className="animate-spin" /> : <Mic />}
               </TooltipTrigger>
               <TooltipContent>
-                {voice.supported
-                  ? recording
-                    ? t('voiceStop')
-                    : t('voiceInput')
-                  : t('voiceUnsupported')}
+                {voice.supported ? t('voiceHold') : t('voiceUnsupported')}
               </TooltipContent>
             </Tooltip>
 
@@ -411,7 +484,9 @@ export function FamilyChat(): React.JSX.Element {
             <p className="px-1 text-xs text-muted-foreground">
               {voice.phase === 'warning' ? t('recordingWarnHint') : t('recordingHint')}
             </p>
-          ) : null}
+          ) : (
+            <p className="px-1 text-xs text-muted-foreground">{t('voiceHoldHint')}</p>
+          )}
         </CardFooter>
       </Card>
     </TooltipProvider>

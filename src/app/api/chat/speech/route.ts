@@ -16,8 +16,8 @@ const speechRequestSchema = z.object({
 });
 
 /**
- * Browser → Okhana → Go-Ai TTS. Explicit opt-in only — never auto-speak chat replies.
- * Hidden for `ru` UI; for `en` UI requires an English language guard on the text.
+ * Browser → Okhana → Go-Ai TTS. Explicit opt-in only — never auto-speak unless
+ * the EN UI toggle is on. Hard RU policy: no TTS for `ru` UI (no Russian model).
  */
 export async function POST(request: Request): Promise<Response> {
   const { userId } = await auth();

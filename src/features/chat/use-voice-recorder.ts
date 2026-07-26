@@ -19,7 +19,10 @@ type UseVoiceRecorderResult = {
   phase: VoiceRecorderPhase;
   elapsedMs: number;
   supported: boolean;
-  toggle: () => void;
+  /** Push-to-talk: pointer/touch down. */
+  pressStart: () => void;
+  /** Push-to-talk: pointer/touch up/cancel → stop, upload, transcript. */
+  pressEnd: () => void;
   stop: () => void;
 };
 
@@ -44,6 +47,9 @@ export function useVoiceRecorder(options: UseVoiceRecorderOptions): UseVoiceReco
   const warnRef = useRef<number | null>(null);
   const hardStopRef = useRef<number | null>(null);
   const uploadingRef = useRef(false);
+  const pressingRef = useRef(false);
+  const optionsRef = useRef(options);
+  optionsRef.current = options;
 
   useEffect(() => {
     setSupported(
@@ -58,6 +64,7 @@ export function useVoiceRecorder(options: UseVoiceRecorderOptions): UseVoiceReco
       clearTimers();
       stopTracks();
       mediaRecorderRef.current = null;
+      pressingRef.current = false;
     };
   }, []);
 
@@ -93,8 +100,9 @@ export function useVoiceRecorder(options: UseVoiceRecorderOptions): UseVoiceReco
     try {
       const formData = new FormData();
       formData.append('file', blob, 'recording.webm');
-      if (options.language) {
-        formData.append('language', options.language);
+      const language = optionsRef.current.language;
+      if (language) {
+        formData.append('language', language);
       }
 
       const response = await fetch('/api/chat/transcribe', {
@@ -109,9 +117,9 @@ export function useVoiceRecorder(options: UseVoiceRecorderOptions): UseVoiceReco
       if (!text) {
         throw new Error('Transcription returned no text');
       }
-      options.onTranscript(text);
+      optionsRef.current.onTranscript(text);
     } catch (error) {
-      options.onError(error instanceof Error ? error.message : 'Transcription failed');
+      optionsRef.current.onError(error instanceof Error ? error.message : 'Transcription failed');
     } finally {
       uploadingRef.current = false;
       setPhase('idle');
@@ -130,12 +138,24 @@ export function useVoiceRecorder(options: UseVoiceRecorderOptions): UseVoiceReco
   }
 
   async function startRecording(): Promise<void> {
-    if (options.disabled || phase !== 'idle' || !supported) {
+    if (optionsRef.current.disabled || !supported) {
+      return;
+    }
+    if (phase !== 'idle' && phase !== 'transcribing') {
+      return;
+    }
+    if (mediaRecorderRef.current || uploadingRef.current) {
       return;
     }
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // User may have released before permission resolved.
+      if (!pressingRef.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+
       streamRef.current = stream;
       chunksRef.current = [];
       const mimeType = pickMimeType();
@@ -157,7 +177,7 @@ export function useVoiceRecorder(options: UseVoiceRecorderOptions): UseVoiceReco
         clearTimers();
         stopTracks();
         setPhase('idle');
-        options.onError('Recording failed');
+        optionsRef.current.onError('Recording failed');
       };
       recorder.onstop = () => {
         clearTimers();
@@ -179,28 +199,40 @@ export function useVoiceRecorder(options: UseVoiceRecorderOptions): UseVoiceReco
       }, VOICE_CAPTURE_WARN_MS);
 
       hardStopRef.current = window.setTimeout(() => {
+        pressingRef.current = false;
         finalizeRecorder();
       }, VOICE_CAPTURE_MAX_MS);
     } catch {
       stopTracks();
       setPhase('idle');
-      options.onError('Microphone permission is required');
+      optionsRef.current.onError('Microphone permission is required');
     }
   }
 
-  function stop(): void {
-    if (phase === 'recording' || phase === 'warning') {
+  function pressStart(): void {
+    if (optionsRef.current.disabled || !supported || uploadingRef.current) {
+      return;
+    }
+    pressingRef.current = true;
+    void startRecording();
+  }
+
+  function pressEnd(): void {
+    if (!pressingRef.current && phase !== 'recording' && phase !== 'warning') {
+      return;
+    }
+    pressingRef.current = false;
+    if (phase === 'recording' || phase === 'warning' || mediaRecorderRef.current) {
       finalizeRecorder();
     }
   }
 
-  function toggle(): void {
-    if (phase === 'recording' || phase === 'warning') {
-      stop();
-      return;
+  function stop(): void {
+    pressingRef.current = false;
+    if (phase === 'recording' || phase === 'warning' || mediaRecorderRef.current) {
+      finalizeRecorder();
     }
-    void startRecording();
   }
 
-  return { phase, elapsedMs, supported, toggle, stop };
+  return { phase, elapsedMs, supported, pressStart, pressEnd, stop };
 }
