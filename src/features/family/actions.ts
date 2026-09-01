@@ -4,6 +4,7 @@ import { auth } from '@clerk/nextjs/server';
 import { eq } from 'drizzle-orm';
 import { db } from '@/lib/server/db';
 import { families, users } from '@/lib/server/db/schema';
+import { ensureDbUser } from '@/lib/server/users/ensure-db-user';
 import { generateInviteCode } from '@/lib/server/utils';
 import { revalidatePath } from 'next/cache';
 import { invalidateDashboardFamilyCache } from '@/features/family/get-dashboard-family';
@@ -24,11 +25,7 @@ export async function createFamily(formData: FormData) {
   }
 
   // Check user doesn't already belong to a family
-  const [user] = await db
-    .select()
-    .from(users)
-    .where(eq(users.clerkId, userId))
-    .limit(1);
+  const user = await ensureDbUser(userId);
 
   if (!user) {
     throw new Error('User not found');
@@ -77,11 +74,7 @@ export async function joinFamily(formData: FormData) {
   }
 
   // Check user doesn't already belong to a family
-  const [user] = await db
-    .select()
-    .from(users)
-    .where(eq(users.clerkId, userId))
-    .limit(1);
+  const user = await ensureDbUser(userId);
 
   if (!user) {
     throw new Error('User not found');

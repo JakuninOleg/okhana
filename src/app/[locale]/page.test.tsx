@@ -10,11 +10,31 @@ vi.mock('@clerk/nextjs/server', () => ({
 vi.mock('next-intl/server', () => ({
   getTranslations: () =>
     Promise.resolve((key: string, vars?: Record<string, string>) => {
-      if (key === 'signIn') return 'Sign in';
-      if (key === 'greeting') return `Hello, ${vars?.email ?? ''}`;
-      if (key === 'signOut') return 'Sign out';
-      return key;
+      const map: Record<string, string> = {
+        brand: 'Okhana',
+        tagline: 'Family. Together. Always.',
+        headline: 'Your family hub, guided by AI',
+        pitch: 'Shared notes and a private assistant.',
+        signIn: 'Sign in',
+        signUp: 'Create account',
+        greeting: `Hello, ${vars?.email ?? ''}`,
+        signOut: 'Sign out',
+      };
+      return map[key] ?? key;
     }),
+}));
+
+vi.mock('next/image', () => ({
+  default: (props: { alt?: string; src: string; className?: string }) =>
+    React.createElement('img', { alt: props.alt ?? '', src: props.src, className: props.className }),
+}));
+
+vi.mock('@/components/ui/button', () => ({
+  buttonVariants: () => 'btn',
+}));
+
+vi.mock('@/lib/utils', () => ({
+  cn: (...parts: Array<string | undefined>) => parts.filter(Boolean).join(' '),
 }));
 
 // Mock redirect from i18n/navigation — capture calls instead of actually redirecting
@@ -82,7 +102,9 @@ describe('Home page', () => {
 
     expect(mockRedirect).not.toHaveBeenCalled();
     const html = renderToString(result);
-    expect(html).toContain('Hello!');
+    expect(html).toContain('Okhana');
+    expect(html).toContain('Family. Together. Always.');
+    expect(html).toContain('Sign in');
   });
 });
 

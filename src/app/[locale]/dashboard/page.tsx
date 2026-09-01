@@ -1,31 +1,47 @@
 import { auth, clerkClient } from '@clerk/nextjs/server';
+import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
-import { InviteCodeDisplay } from '@/features/family/invite-code-display';
+import { FamilyHubMenu } from '@/features/family/family-hub-menu';
 import { FamilySetupForm } from '@/features/family/family-setup-form';
 import { getDashboardFamilyData } from '@/features/family/get-dashboard-family';
 import { FamilyChatLoader } from '@/features/chat/family-chat-loader';
-import { isLocale } from '@/i18n/routing';
+import { isLocale, routing } from '@/i18n/routing';
 import { redirect } from '@/i18n/navigation';
 
 export const dynamic = 'force-dynamic';
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale: raw } = await params;
+  const locale = isLocale(raw) ? raw : routing.defaultLocale;
+  const t = await getTranslations({ locale, namespace: 'Dashboard' });
+  return {
+    title: t('metaTitle'),
+    robots: { index: false, follow: false },
+  };
+}
 
 export default async function DashboardPage({
   params,
 }: {
   params: Promise<{ locale: string }>;
 }): Promise<React.JSX.Element> {
-  const [{ locale: rawLocale }, { userId }, t] = await Promise.all([
-    params,
-    auth(),
-    getTranslations('Dashboard'),
-  ]);
+  const [{ locale: rawLocale }, { userId }] = await Promise.all([params, auth()]);
   const locale = isLocale(rawLocale) ? rawLocale : 'ru';
+  const [t, tOnboarding] = await Promise.all([
+    getTranslations({ locale, namespace: 'Dashboard' }),
+    getTranslations({ locale, namespace: 'Dashboard.onboarding' }),
+  ]);
 
   if (!userId) {
     redirect({ href: '/', locale });
   }
 
   let email = '';
+  let displayName = '';
   let familyName: string | null = null;
   let inviteCode: string | null = null;
   let hasFamily = false;
@@ -41,46 +57,80 @@ export default async function DashboardPage({
     members = data.members;
     dbError = data.dbError;
 
-    if (!email && !dbError) {
-      try {
-        const client = await clerkClient();
-        const clerkUser = await client.users.getUser(userId);
+    try {
+      const client = await clerkClient();
+      const clerkUser = await client.users.getUser(userId);
+      if (!email) {
         email = clerkUser.emailAddresses[0]?.emailAddress ?? '';
-      } catch (error) {
-        console.error('Failed to fetch user from Clerk API:', error);
+      }
+      displayName =
+        clerkUser.firstName
+        ?? email.split('@')[0]
+        ?? email;
+    } catch (error) {
+      console.error('Failed to fetch user from Clerk API:', error);
+      if (email) {
+        displayName = email.split('@')[0] ?? email;
       }
     }
   }
 
-  return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-6 p-6">
-      <h1 className="text-3xl font-semibold tracking-tight">
-        {t('greeting', { email })}
-      </h1>
+  if (!displayName && email) {
+    displayName = email.split('@')[0] ?? email;
+  }
 
-      {dbError ? (
+  if (dbError) {
+    return (
+      <main className="flex flex-1 flex-col items-center justify-center gap-4 py-8">
+        <h1 className="text-2xl font-semibold tracking-tight">
+          {t('greeting', { email })}
+        </h1>
         <p className="text-sm text-destructive">{dbError}</p>
-      ) : hasFamily ? (
-        <div className="w-full max-w-2xl space-y-4">
-          <p className="text-lg text-muted-foreground">
-            {t('familyInfo', { name: familyName! })}
-          </p>
-          <InviteCodeDisplay code={inviteCode!} />
-          <div className="space-y-2">
-            <h2 className="font-semibold">{t('members')}</h2>
-            <ul className="space-y-1">
-              {members.map((member) => (
-                <li key={member.email} className="text-sm text-muted-foreground">
-                  {member.email} — {member.familyRole}
-                </li>
-              ))}
-            </ul>
-          </div>
-          <FamilyChatLoader />
+      </main>
+    );
+  }
+
+  if (!hasFamily) {
+    return (
+      <main className="relative flex flex-1 flex-col py-6 sm:py-10">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--brand-sun)_0%,_transparent_55%),radial-gradient(ellipse_at_bottom,_var(--brand-aqua)_0%,_transparent_50%)] opacity-60 dark:opacity-20"
+        />
+        <div className="relative mx-auto flex w-full max-w-lg flex-col gap-6 px-1">
+          <header className="space-y-2 text-center sm:text-left">
+            <p className="text-xs font-medium uppercase tracking-[0.2em] text-brand-peach">
+              {tOnboarding('eyebrow')}
+            </p>
+            <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+              {tOnboarding('welcome', { name: displayName })}
+            </h1>
+            <p className="text-base font-medium text-foreground">
+              {tOnboarding('title')}
+            </p>
+            <p className="text-sm text-muted-foreground sm:text-base">
+              {tOnboarding('subtitle')}
+            </p>
+          </header>
+          <FamilySetupForm />
         </div>
-      ) : (
-        <FamilySetupForm />
-      )}
+      </main>
+    );
+  }
+
+  return (
+    <main className="flex min-h-0 flex-1 flex-col gap-3 py-3 sm:gap-4 sm:py-4">
+      <FamilyHubMenu
+        familyName={familyName!}
+        inviteCode={inviteCode!}
+        members={members}
+        displayName={displayName}
+        userEmail={email}
+      />
+
+      <div className="flex min-h-0 flex-1 flex-col">
+        <FamilyChatLoader />
+      </div>
     </main>
   );
 }

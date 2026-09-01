@@ -9,9 +9,14 @@ const mockInvalidateDashboardFamilyCache = vi.hoisted(() => vi.fn());
 
 // Mock generateInviteCode — deterministic for happy-path assertions
 const mockGenerateInviteCode = vi.hoisted(() => vi.fn());
+const mockEnsureDbUser = vi.hoisted(() => vi.fn());
 
 vi.mock('@/features/family/get-dashboard-family', () => ({
   invalidateDashboardFamilyCache: (...args: unknown[]) => mockInvalidateDashboardFamilyCache(...args),
+}));
+
+vi.mock('@/lib/server/users/ensure-db-user', () => ({
+  ensureDbUser: (...args: unknown[]) => mockEnsureDbUser(...args),
 }));
 
 vi.mock('@/lib/server/db/schema', () => ({
@@ -89,7 +94,7 @@ describe('createFamily', () => {
     await expect(createFamily(formData({ name: 'Smiths' }))).rejects.toThrow(
       'Not authenticated',
     );
-    expect(mockSelectLimit).not.toHaveBeenCalled();
+    expect(mockEnsureDbUser).not.toHaveBeenCalled();
   });
 
   it('throws when the family name is empty', async () => {
@@ -99,12 +104,12 @@ describe('createFamily', () => {
     await expect(createFamily(formData({ name: '' }))).rejects.toThrow(
       'Family name is required',
     );
-    expect(mockSelectLimit).not.toHaveBeenCalled();
+    expect(mockEnsureDbUser).not.toHaveBeenCalled();
   });
 
   it('throws when the user is not found in the database', async () => {
     mockAuth.mockResolvedValue({ userId: 'user_1' });
-    mockSelectLimit.mockResolvedValue([]);
+    mockEnsureDbUser.mockResolvedValue(null);
     const { createFamily } = await loadActions();
 
     await expect(createFamily(formData({ name: 'Smiths' }))).rejects.toThrow(
@@ -114,7 +119,7 @@ describe('createFamily', () => {
 
   it('throws when the user already belongs to a family', async () => {
     mockAuth.mockResolvedValue({ userId: 'user_1' });
-    mockSelectLimit.mockResolvedValue([{ id: 1, familyId: 5 }]);
+    mockEnsureDbUser.mockResolvedValue({ id: 1, familyId: 5 });
     const { createFamily } = await loadActions();
 
     await expect(createFamily(formData({ name: 'Smiths' }))).rejects.toThrow(
@@ -125,7 +130,7 @@ describe('createFamily', () => {
 
   it('creates a family, links the user as owner, and revalidates the dashboard', async () => {
     mockAuth.mockResolvedValue({ userId: 'user_1' });
-    mockSelectLimit.mockResolvedValue([{ id: 1, familyId: null }]);
+    mockEnsureDbUser.mockResolvedValue({ id: 1, familyId: null });
     mockInsertReturning.mockResolvedValue([{ id: 10 }]);
     mockUpdateWhere.mockResolvedValue(undefined);
     const { createFamily } = await loadActions();
@@ -175,7 +180,7 @@ describe('joinFamily', () => {
 
   it('throws when the user already belongs to a family', async () => {
     mockAuth.mockResolvedValue({ userId: 'user_1' });
-    mockSelectLimit.mockResolvedValue([{ id: 1, familyId: 5 }]);
+    mockEnsureDbUser.mockResolvedValue({ id: 1, familyId: 5 });
     const { joinFamily } = await loadActions();
 
     await expect(joinFamily(formData({ inviteCode: 'ABCD2345' }))).rejects.toThrow(
@@ -185,10 +190,8 @@ describe('joinFamily', () => {
 
   it('throws when the invite code does not match any family', async () => {
     mockAuth.mockResolvedValue({ userId: 'user_1' });
-    // first select: user lookup (no family) → second select: family lookup (none)
-    mockSelectLimit
-      .mockResolvedValueOnce([{ id: 1, familyId: null }])
-      .mockResolvedValueOnce([]);
+    mockEnsureDbUser.mockResolvedValue({ id: 1, familyId: null });
+    mockSelectLimit.mockResolvedValueOnce([]);
     const { joinFamily } = await loadActions();
 
     await expect(joinFamily(formData({ inviteCode: 'nope1234' }))).rejects.toThrow(
@@ -199,9 +202,8 @@ describe('joinFamily', () => {
 
   it('joins the family as an adult and revalidates the dashboard', async () => {
     mockAuth.mockResolvedValue({ userId: 'user_1' });
-    mockSelectLimit
-      .mockResolvedValueOnce([{ id: 1, familyId: null }])
-      .mockResolvedValueOnce([{ id: 10 }]);
+    mockEnsureDbUser.mockResolvedValue({ id: 1, familyId: null });
+    mockSelectLimit.mockResolvedValueOnce([{ id: 10 }]);
     mockUpdateWhere.mockResolvedValue(undefined);
     const { joinFamily } = await loadActions();
 

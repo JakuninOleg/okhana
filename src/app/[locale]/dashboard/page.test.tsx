@@ -33,12 +33,17 @@ vi.mock('@/i18n/navigation', () => ({
 }));
 
 vi.mock('next-intl/server', () => ({
-  getTranslations: () =>
-    Promise.resolve((key: string, vars?: Record<string, string>) => {
+  getTranslations: (opts?: string | { locale?: string; namespace?: string }) => {
+    const namespace = typeof opts === 'object' ? opts.namespace : undefined;
+    return Promise.resolve((key: string, vars?: Record<string, string>) => {
+      if (namespace === 'Dashboard.onboarding' && key === 'welcome') {
+        return `Welcome, ${vars?.name ?? ''}`;
+      }
       if (key === 'greeting') return `Hello, ${vars?.email ?? ''}`;
       if (key === 'signOut') return 'Sign out';
       return key;
-    }),
+    });
+  },
 }));
 
 const mockGetDashboardFamilyData = vi.hoisted(() => vi.fn());
@@ -50,9 +55,14 @@ vi.mock('@/features/chat/family-chat-loader', () => ({
   FamilyChatLoader: () => React.createElement('div', null, 'Family chat'),
 }));
 
-vi.mock('@/features/family/invite-code-display', () => ({
-  InviteCodeDisplay: ({ code }: { code: string }) =>
-    React.createElement('div', null, code),
+vi.mock('@/features/family/family-hub-menu', () => ({
+  FamilyHubMenu: ({
+    familyName,
+    inviteCode,
+  }: {
+    familyName: string;
+    inviteCode: string;
+  }) => React.createElement('div', null, familyName, inviteCode),
 }));
 
 vi.mock('@/features/family/family-setup-form', () => ({
@@ -94,7 +104,7 @@ describe('Dashboard page', () => {
     });
   });
 
-  it('renders greeting with user email from database', async () => {
+  it('renders onboarding welcome when user has no family', async () => {
     mockAuth.mockResolvedValue({ userId: 'user_123' });
 
     const { default: DashboardPage } = await import('./page');
@@ -103,7 +113,8 @@ describe('Dashboard page', () => {
     }) as React.ReactElement;
 
     const html = renderToString(result);
-    expect(html).toContain('Hello, test@example.com');
+    expect(html).toContain('Welcome, test');
+    expect(html).toContain('Family setup');
   });
 
   it('falls back to Clerk API when user not found in db', async () => {
@@ -124,7 +135,7 @@ describe('Dashboard page', () => {
     }) as React.ReactElement;
 
     const html = renderToString(result);
-    expect(html).toContain('Hello, fallback@example.com');
+    expect(html).toContain('Welcome, fallback');
   });
 
   it('shows the db error message when the query fails, without falling back silently', async () => {
@@ -178,7 +189,8 @@ describe('Dashboard page', () => {
     }) as React.ReactElement;
 
     const html = renderToString(result);
+    expect(html).toContain('Smiths');
     expect(html).toContain('ABCD2345');
-    expect(html).toContain('familyInfo');
+    expect(html).toContain('Family chat');
   });
 });

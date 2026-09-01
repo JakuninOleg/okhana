@@ -305,8 +305,8 @@ export function FamilyChat(): React.JSX.Element {
 
   return (
     <TooltipProvider>
-      <Card className="w-full max-w-2xl gap-0 overflow-hidden border-border/60 bg-card/90 py-0 shadow-sm backdrop-blur-sm">
-        <CardHeader className="gap-3 border-b border-border/60 px-5 py-4">
+      <Card className="flex h-full min-h-[24rem] w-full flex-1 flex-col gap-0 overflow-hidden border-border/60 bg-card/90 py-0 shadow-sm backdrop-blur-sm sm:min-h-[28rem]">
+        <CardHeader className="shrink-0 gap-3 border-b border-border/60 px-4 py-3 sm:px-5 sm:py-4">
           <div className="flex items-start gap-3">
             <OkhanaAvatar size="lg" label={t('assistantName')} />
             <div className="min-w-0 flex-1 space-y-1">
@@ -315,8 +315,8 @@ export function FamilyChat(): React.JSX.Element {
                   <p className="text-[0.7rem] font-medium uppercase tracking-[0.18em] text-muted-foreground">
                     {t('eyebrow')}
                   </p>
-                  <CardTitle className="text-xl tracking-tight">{t('title')}</CardTitle>
-                  <CardDescription>{t('description')}</CardDescription>
+                  <CardTitle className="text-lg tracking-tight sm:text-xl">{t('title')}</CardTitle>
+                  <CardDescription className="hidden sm:block">{t('description')}</CardDescription>
                 </div>
                 {locale === 'en' ? (
                   <div className="flex shrink-0 items-center gap-2 rounded-xl border border-border/60 bg-muted/30 px-2.5 py-1.5">
@@ -350,10 +350,10 @@ export function FamilyChat(): React.JSX.Element {
           </div>
         </CardHeader>
 
-        <CardContent className="px-0 py-0">
+        <CardContent className="flex min-h-0 flex-1 flex-col px-0 py-0">
           <div
             ref={listRef}
-            className="h-[26rem] space-y-5 overflow-y-auto px-4 py-5 sm:px-5"
+            className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-4 py-4 sm:px-5 sm:py-5"
             aria-live="polite"
           >
             {status === 'loadingHistory' ? (
@@ -390,7 +390,7 @@ export function FamilyChat(): React.JSX.Element {
           </p>
         ) : null}
 
-        <CardFooter className="flex-col items-stretch gap-2 border-border/60 bg-muted/20 px-3 py-3 dark:bg-muted/10">
+        <CardFooter className="shrink-0 flex-col items-stretch gap-2 border-border/60 bg-muted/20 px-3 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] dark:bg-muted/10">
           <div
             className={cn(
               'flex items-end gap-2 rounded-2xl border border-border/70 bg-background/90 p-2 shadow-sm',

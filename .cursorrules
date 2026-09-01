@@ -48,6 +48,7 @@ Okhana is an AI-powered family hub. The core principle: **"AI is the architectur
 
 ### Database & Privacy
 - Schema lives in `src/lib/server/db/schema.ts`.
+- **Single Supabase project (`okhana`)** for local, Preview, and Production — no `okhana-dev`.
 - **Privacy filtering happens at the DB query level** — before any data reaches the AI model.
 - Never rely on prompt engineering for privacy. The model must never see data the user doesn't have access to.
 - All queries go through Drizzle ORM. No raw SQL strings.

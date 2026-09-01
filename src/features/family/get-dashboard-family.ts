@@ -1,46 +1,25 @@
 import { cache } from 'react';
 import { eq } from 'drizzle-orm';
 import { getCachedChatContext, setCachedChatContext } from '@/features/chat/chat-context-cache';
+import {
+  getCachedDashboardFamily,
+  setCachedDashboardFamily,
+  type DashboardFamilyData,
+  type DashboardFamilyMember,
+} from '@/features/family/family-cache';
 import { db } from '@/lib/server/db';
 import { withDbRetry } from '@/lib/server/db/client';
 import { families, users } from '@/lib/server/db/schema';
+import { ensureDbUser } from '@/lib/server/users/ensure-db-user';
 
-export type DashboardFamilyMember = {
-  email: string;
-  familyRole: string | null;
-};
-
-export type DashboardFamilyData = {
-  email: string;
-  familyName: string | null;
-  familyId: number | null;
-  inviteCode: string | null;
-  hasFamily: boolean;
-  members: DashboardFamilyMember[];
-  dbError: string | null;
-};
-
-type CacheEntry = { at: number; data: DashboardFamilyData };
-
-type GlobalFamilyCache = typeof globalThis & {
-  __okhanaFamilyCache?: Map<string, CacheEntry>;
-};
-
-const FAMILY_CACHE_TTL_MS = 30_000;
-
-function familyCache(): Map<string, CacheEntry> {
-  const globalCache = globalThis as GlobalFamilyCache;
-  if (!globalCache.__okhanaFamilyCache) {
-    globalCache.__okhanaFamilyCache = new Map();
-  }
-  return globalCache.__okhanaFamilyCache;
-}
-
-export function invalidateDashboardFamilyCache(clerkUserId: string): void {
-  familyCache().delete(clerkUserId);
-}
+export type { DashboardFamilyData, DashboardFamilyMember };
+export { invalidateDashboardFamilyCache } from '@/features/family/family-cache';
 
 async function queryDashboardFamily(clerkUserId: string): Promise<DashboardFamilyData> {
+  // Clerk API + user sync must stay outside the DB mutex — withDbRetry serializes
+  // all Postgres access and nested calls deadlocked here (4s query timeouts).
+  const sync = await ensureDbUser(clerkUserId);
+
   return withDbRetry(async () => {
     const [result] = await db
       .select({
@@ -56,7 +35,7 @@ async function queryDashboardFamily(clerkUserId: string): Promise<DashboardFamil
       .where(eq(users.clerkId, clerkUserId))
       .limit(1);
 
-    const familyId = result?.familyId ?? null;
+    const familyId = result?.familyId ?? sync?.familyId ?? null;
     const hasFamily = result?.familyName != null;
 
     const members = hasFamily && familyId
@@ -71,8 +50,6 @@ async function queryDashboardFamily(clerkUserId: string): Promise<DashboardFamil
         .where(eq(users.familyId, familyId))
       : [];
 
-    // Warm chat cache so the first message does not wait on Postgres.
-    // Preserve an existing conversation session if the cache already has one.
     if (result?.userId && familyId && result.familyRole) {
       const existing = getCachedChatContext(clerkUserId);
       setCachedChatContext(clerkUserId, {
@@ -91,7 +68,7 @@ async function queryDashboardFamily(clerkUserId: string): Promise<DashboardFamil
     }
 
     return {
-      email: result?.email ?? '',
+      email: result?.email ?? sync?.email ?? '',
       familyName: result?.familyName ?? null,
       familyId,
       inviteCode: result?.inviteCode ?? null,
@@ -105,19 +82,15 @@ async function queryDashboardFamily(clerkUserId: string): Promise<DashboardFamil
   });
 }
 
-/**
- * Per-request React.cache + short in-process TTL so locale switches reuse
- * family data without Next Data Cache revalidation storms against Postgres.
- */
 export const getDashboardFamilyData = cache(async (clerkUserId: string): Promise<DashboardFamilyData> => {
-  const cached = familyCache().get(clerkUserId);
-  if (cached && Date.now() - cached.at < FAMILY_CACHE_TTL_MS && !cached.data.dbError) {
-    return cached.data;
+  const cached = getCachedDashboardFamily(clerkUserId);
+  if (cached) {
+    return cached;
   }
 
   try {
     const data = await queryDashboardFamily(clerkUserId);
-    familyCache().set(clerkUserId, { at: Date.now(), data });
+    setCachedDashboardFamily(clerkUserId, data);
     return data;
   } catch (error) {
     console.error('dashboard family load failed', {

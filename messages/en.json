@@ -1,15 +1,67 @@
 {
+  "Meta": {
+    "title": "Okhana — Family. Together. Always.",
+    "description": "Okhana is an AI-powered family hub: shared notes, reminders, and a private assistant that only sees what each person is allowed to see.",
+    "ogTitle": "Okhana — Family hub with AI",
+    "ogDescription": "Family. Together. Always. Keep your household in sync with a privacy-first AI assistant."
+  },
   "Home": {
-    "signIn": "Sign in"
+    "brand": "Okhana",
+    "tagline": "Family. Together. Always.",
+    "headline": "Your family hub, guided by AI",
+    "pitch": "Shared notes, reminders, and an assistant that only sees what each person is allowed to see — privacy at the source, not in the prompt.",
+    "signIn": "Sign in",
+    "signUp": "Create account"
   },
   "Navbar": {
-    "signIn": "Sign in"
+    "signIn": "Sign in",
+    "brand": "Okhana"
   },
   "Dashboard": {
+    "metaTitle": "Dashboard",
     "greeting": "Hello, {email}",
     "signOut": "Sign out",
     "familyInfo": "Your family: {name}",
     "members": "Family members",
+    "familyHub": {
+      "openMenu": "Family",
+      "title": "Family space",
+      "signedInAs": "Signed in as {name}",
+      "inviteTitle": "Invite code",
+      "inviteDescription": "Share this code so partner, kids, or relatives can join your family in Okhana.",
+      "copy": "Copy",
+      "copied": "Copied!",
+      "membersTitle": "Members",
+      "roleOwner": "Owner",
+      "roleAdult": "Adult",
+      "roleChild": "Child",
+      "roleUnknown": "Member",
+      "comingSoon": "Calendar, notes, and family settings will live here soon."
+    },
+    "onboarding": {
+      "eyebrow": "Almost there",
+      "title": "Set up your family space",
+      "subtitle": "Create a new family for your household, or join one with an invite code from someone who already uses Okhana.",
+      "welcome": "Welcome, {name}",
+      "chooseCreateTitle": "Start a new family",
+      "chooseCreateDescription": "You'll get an invite code to share with partner, kids, or relatives.",
+      "chooseJoinTitle": "Join with an invite code",
+      "chooseJoinDescription": "Someone in your family already created a space — enter their code.",
+      "createTitle": "Name your family",
+      "createDescription": "Pick something everyone will recognize — you can change it later.",
+      "joinTitle": "Enter your invite code",
+      "joinDescription": "Ask your family owner for the code from their Okhana dashboard.",
+      "familyNameLabel": "Family name",
+      "familyNamePlaceholder": "e.g. The Kemz family",
+      "inviteCodeLabel": "Invite code",
+      "inviteCodePlaceholder": "ABC123",
+      "inviteCodeHint": "Codes are not case-sensitive.",
+      "createSubmit": "Create family",
+      "createSubmitting": "Creating…",
+      "joinSubmit": "Join family",
+      "joinSubmitting": "Joining…",
+      "back": "Back"
+    },
     "voiceChat": {
       "eyebrow": "Family assistant",
       "assistantName": "Okhana",
@@ -39,5 +91,4 @@
       "streamUnavailable": "Streaming is not available in this browser."
     }
   }
-
 }

@@ -36,8 +36,8 @@ export default clerkMiddleware((auth, req) => {
   // authorizedParties prevents subdomain cookie-leaking attacks (CSRF) and
   // must include every origin the app is reachable from — otherwise Clerk
   // rejects the session token and redirects to sign-in in a loop ("Unsafe
-  // attempt to load URL ... from frame" console error). Git-staging is for testing
-  // on preview vercel environment 
+  // attempt to load URL ... from frame" console error). Staging Preview URL
+  // is listed for Clerk Development sessions during integration testing.
   authorizedParties,
 });
 

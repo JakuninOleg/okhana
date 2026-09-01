@@ -189,15 +189,20 @@ npm run dev
 
 ### Required Environment Variables
 
+All deploy targets share the **same Supabase `okhana` project** (no dev database).
+
 | Variable | Description |
 |---|---|
-| `DATABASE_URL` | Supabase transaction pooler (`:6543`). Used by the Next.js app at runtime |
+| `DATABASE_URL` | Supabase transaction pooler (`:6543`). Runtime queries from Next.js |
 | `DIRECT_URL` | Session/direct Postgres URL (`:5432`). **Migrations only** (`drizzle-kit`) — do not point the app at this or you will hit `EMAXCONNSESSION` (pool ~15) |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk publishable key |
 | `CLERK_SECRET_KEY` | Clerk secret key |
 | `CLERK_WEBHOOK_SECRET` | Clerk webhook signing secret |
 | `GO_AI_BASE_URL` | Go-Ai gateway base URL (server-only) |
 | `GO_AI_SHARED_SECRET` | Go-Ai bearer secret (server-only, never `NEXT_PUBLIC_*`) |
+
+Set the same `DATABASE_URL` / `DIRECT_URL` in Vercel for **Preview** and **Production**.
+Use Clerk Development keys on Preview; Production keys on `main` only.
 
 ### Clerk: Development vs Production Keys
 
@@ -208,9 +213,17 @@ Clerk requires **two separate key pairs**, and they are not interchangeable:
 | **Development** | `pk_test_` / `sk_test_` | `localhost` only — used for local dev |
 | **Production** | `pk_live_` / `sk_live_` | `okhanahome.com` only — enforces origin validation, requires HTTPS |
 
-Production keys **will not work on `localhost`** — Clerk validates the request origin against the configured production domain. Use development keys locally, and set the production keys as environment variables in the Vercel project settings (not in `.env.local`).
+Production keys **will not work on `localhost`** — Clerk validates the request origin against the configured production domain. Use development keys locally, production keys in Vercel **Production** only, and development keys on Vercel **Preview** (PR deploys).
 
 The production instance is configured with a custom domain — **okhanahome.com** — purchased specifically to support Clerk's production requirements (Clerk needs a domain you control to add its verification/session DNS records; a `*.vercel.app` domain doesn't support this).
+
+### Database safety (single `okhana` project)
+
+Because local and Preview use the **production database**, treat schema changes as production operations:
+
+- Run `npm run db:generate` locally, review SQL in `drizzle/`, then `npm run db:migrate` deliberately.
+- Avoid `db:push` against shared data unless you know the diff is safe.
+- Do not seed or delete rows casually on localhost — it affects real families.
 
 ---
 
