@@ -17,6 +17,18 @@ describe('i18n message catalogs', () => {
     expect(ru.Home.signIn).toBe('Войти');
   });
 
+  it('Meta SEO strings exist in both locales', () => {
+    expect(en.Meta.title).toContain('Okhana');
+    expect(ru.Meta.title).toContain('Охана');
+    expect(en.Meta.description.length).toBeGreaterThan(40);
+    expect(ru.Meta.description.length).toBeGreaterThan(40);
+  });
+
+  it('Home brand tagline matches logo strategy', () => {
+    expect(en.Home.tagline).toBe('Family. Together. Always.');
+    expect(ru.Home.tagline).toBe('Семья. Вместе. Всегда.');
+  });
+
   it('Dashboard.greeting exists in both locales and contains {email} placeholder', () => {
     expect(en.Dashboard.greeting).toContain('{email}');
     expect(ru.Dashboard.greeting).toContain('{email}');

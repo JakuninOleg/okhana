@@ -1,131 +1,136 @@
 import { auth, clerkClient } from '@clerk/nextjs/server';
-import { eq } from 'drizzle-orm';
+import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
-import { db } from '@/lib/server/db';
-import { families, users } from '@/lib/server/db/schema';
+import { FamilyHubMenu } from '@/features/family/family-hub-menu';
+import { FamilySetupForm } from '@/features/family/family-setup-form';
+import { getDashboardFamilyData } from '@/features/family/get-dashboard-family';
+import { FamilyChatLoader } from '@/features/chat/family-chat-loader';
+import { isLocale, routing } from '@/i18n/routing';
 import { redirect } from '@/i18n/navigation';
-import { SignOutButtonClient } from './SignOutButtonClient';
-import { FamilySetupForm } from './family-setup-form';
-import { InviteCodeDisplay } from './invite-code-display';
 
-// Force dynamic rendering — auth() requires request context from middleware.
 export const dynamic = 'force-dynamic';
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale: raw } = await params;
+  const locale = isLocale(raw) ? raw : routing.defaultLocale;
+  const t = await getTranslations({ locale, namespace: 'Dashboard' });
+  return {
+    title: t('metaTitle'),
+    robots: { index: false, follow: false },
+  };
+}
 
 export default async function DashboardPage({
   params,
 }: {
   params: Promise<{ locale: string }>;
 }): Promise<React.JSX.Element> {
-  const [{ locale }, { userId }] = await Promise.all([params, auth()]);
+  const [{ locale: rawLocale }, { userId }] = await Promise.all([params, auth()]);
+  const locale = isLocale(rawLocale) ? rawLocale : 'ru';
+  const [t, tOnboarding] = await Promise.all([
+    getTranslations({ locale, namespace: 'Dashboard' }),
+    getTranslations({ locale, namespace: 'Dashboard.onboarding' }),
+  ]);
 
-  // Explicit auth guard — middleware protects routes, but defence-in-depth:
-  // redirect unauthenticated users to the home page instead of rendering
-  // the dashboard with an empty email.
   if (!userId) {
     redirect({ href: '/', locale });
   }
 
-  // Try to get email and family info from Supabase (synced via Clerk webhook).
-  // Fall back to Clerk API if the DB query fails or the user hasn't been
-  // synced yet — this happens in local dev where Clerk webhooks can't
-  // reach localhost.
   let email = '';
+  let displayName = '';
   let familyName: string | null = null;
-  let familyId: number | null = null;
   let inviteCode: string | null = null;
   let hasFamily = false;
+  let members: { email: string; familyRole: string | null }[] = [];
   let dbError: string | null = null;
 
   if (userId) {
+    const data = await getDashboardFamilyData(userId);
+    email = data.email;
+    familyName = data.familyName;
+    inviteCode = data.inviteCode;
+    hasFamily = data.hasFamily;
+    members = data.members;
+    dbError = data.dbError;
+
     try {
-      const [result] = await db
-        .select({
-          email: users.email,
-          familyId: families.id,
-          familyName: families.name,
-          inviteCode: families.inviteCode,
-        })
-        .from(users)
-        .leftJoin(families, eq(users.familyId, families.id))
-        .where(eq(users.clerkId, userId))
-        .limit(1);
-
-      email = result?.email ?? '';
-      familyName = result?.familyName ?? null;
-      familyId = result?.familyId ?? null;
-      inviteCode = result?.inviteCode ?? null;
-      hasFamily = familyName !== null;
-    } catch (e) {
-      // DB query failed — likely a connection issue or the table hasn't
-      // been created yet. Store the error to display instead of silently
-      // showing the setup form, which would cause a confusing UX.
-      dbError = e instanceof Error ? e.message : 'Database connection failed';
-    }
-
-    if (!email && !dbError) {
-      try {
-        const client = await clerkClient();
-        const clerkUser = await client.users.getUser(userId);
+      const client = await clerkClient();
+      const clerkUser = await client.users.getUser(userId);
+      if (!email) {
         email = clerkUser.emailAddresses[0]?.emailAddress ?? '';
-      } catch (e) {
-        // Clerk API failure (rate limit, network, etc.) — don't crash the
-        // page. The user will see an empty greeting, recoverable on reload.
-        console.error('Failed to fetch user from Clerk API:', e);
+      }
+      displayName =
+        clerkUser.firstName
+        ?? email.split('@')[0]
+        ?? email;
+    } catch (error) {
+      console.error('Failed to fetch user from Clerk API:', error);
+      if (email) {
+        displayName = email.split('@')[0] ?? email;
       }
     }
   }
 
-  // Fetch family members if the user belongs to a family.
-  // Wrapped in try-catch separately from the main query — a connection drop
-  // here must not crash the entire Server Component render. In production
-  // Next.js masks such errors as a generic "An error occurred in the Server
-  // Components render", which is opaque to the user.
-  let members: { email: string; familyRole: string | null }[] = [];
-  if (hasFamily && familyId) {
-    try {
-      members = await db
-        .select({ email: users.email, familyRole: users.familyRole })
-        .from(users)
-        .where(eq(users.familyId, familyId));
-    } catch (e) {
-      // Non-critical: show the family info without the members list rather
-      // than crashing the whole page.
-      console.error('Failed to fetch family members:', e);
-    }
+  if (!displayName && email) {
+    displayName = email.split('@')[0] ?? email;
   }
 
-  const t = await getTranslations('Dashboard');
+  if (dbError) {
+    return (
+      <main className="flex flex-1 flex-col items-center justify-center gap-4 py-8">
+        <h1 className="text-2xl font-semibold tracking-tight">
+          {t('greeting', { email })}
+        </h1>
+        <p className="text-sm text-destructive">{dbError}</p>
+      </main>
+    );
+  }
+
+  if (!hasFamily) {
+    return (
+      <main className="relative flex flex-1 flex-col py-6 sm:py-10">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--brand-sun)_0%,_transparent_55%),radial-gradient(ellipse_at_bottom,_var(--brand-aqua)_0%,_transparent_50%)] opacity-60 dark:opacity-20"
+        />
+        <div className="relative mx-auto flex w-full max-w-lg flex-col gap-6 px-1">
+          <header className="space-y-2 text-center sm:text-left">
+            <p className="text-xs font-medium uppercase tracking-[0.2em] text-brand-peach">
+              {tOnboarding('eyebrow')}
+            </p>
+            <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+              {tOnboarding('welcome', { name: displayName })}
+            </h1>
+            <p className="text-base font-medium text-foreground">
+              {tOnboarding('title')}
+            </p>
+            <p className="text-sm text-muted-foreground sm:text-base">
+              {tOnboarding('subtitle')}
+            </p>
+          </header>
+          <FamilySetupForm />
+        </div>
+      </main>
+    );
+  }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-6 p-6">
-      <h1 className="text-3xl font-semibold tracking-tight">
-        {t('greeting', { email })}
-      </h1>
+    <main className="flex min-h-0 flex-1 flex-col gap-3 py-3 sm:gap-4 sm:py-4">
+      <FamilyHubMenu
+        familyName={familyName!}
+        inviteCode={inviteCode!}
+        members={members}
+        displayName={displayName}
+        userEmail={email}
+      />
 
-      {dbError ? (
-        <p className="text-sm text-destructive">{dbError}</p>
-      ) : hasFamily ? (
-        <div className="w-full max-w-md space-y-4">
-          <p className="text-lg text-muted-foreground">
-            {t('familyInfo', { name: familyName! })}
-          </p>
-          <InviteCodeDisplay code={inviteCode!} />
-          <div className="space-y-2">
-            <h2 className="font-semibold">{t('members')}</h2>
-            <ul className="space-y-1">
-              {members.map((m) => (
-                <li key={m.email} className="text-sm text-muted-foreground">
-                  {m.email} — {m.familyRole}
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      ) : (
-        <FamilySetupForm />
-      )}
-
-      <SignOutButtonClient locale={locale} />
+      <div className="flex min-h-0 flex-1 flex-col">
+        <FamilyChatLoader />
+      </div>
     </main>
   );
 }

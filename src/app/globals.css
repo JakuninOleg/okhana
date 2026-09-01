@@ -1,14 +1,28 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "@clerk/ui/themes/shadcn.css";
+
+html {
+  font-size: 16px;
+}
+
+/* Clerk default theme follows color-scheme — keep in sync with cookie-based .light / .dark */
+html.light {
+  color-scheme: light;
+}
+
+html.dark {
+  color-scheme: dark;
+}
 
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-sans);
   --font-mono: var(--font-geist-mono);
-  --font-heading: ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-sans);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -38,6 +52,12 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+  --color-brand-cream: var(--brand-cream);
+  --color-brand-teal: var(--brand-teal);
+  --color-brand-peach: var(--brand-peach);
+  --color-brand-aqua: var(--brand-aqua);
+  --color-brand-sage: var(--brand-sage);
+  --color-brand-sun: var(--brand-sun);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -47,73 +67,90 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/*
+  Logo-derived brand surface.
+  Teal = family silhouettes / wordmark · Peach = hibiscus / sunset
+  Aqua = ocean · Sage = foliage · Cream = sand/sky canvas · Sun = horizon glow
+*/
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: #059669;
-  --primary-foreground: #ffffff;
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  --brand-cream: #f9f7f2;
+  --brand-teal: #1a3533;
+  --brand-peach: #e89b6c;
+  --brand-aqua: #a8cdc8;
+  --brand-sage: #6f8f7c;
+  --brand-sun: #ffe7cb;
+  --background: #f9f7f2;
+  --foreground: #1a3533;
+  --card: #fffcf7;
+  --card-foreground: #1a3533;
+  --popover: #fffcf7;
+  --popover-foreground: #1a3533;
+  --primary: #1a3533;
+  --primary-foreground: #f9f7f2;
+  --secondary: #e7efed;
+  --secondary-foreground: #1a3533;
+  --muted: #ebe6dc;
+  --muted-foreground: #5c6f6c;
+  --accent: #f3d2bc;
+  --accent-foreground: #1a3533;
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: #10b981;
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --border: #d9e0de;
+  --input: #d9e0de;
+  --ring: #e89b6c;
+  --chart-1: #1a3533;
+  --chart-2: #e89b6c;
+  --chart-3: #a8cdc8;
+  --chart-4: #6f8f7c;
+  --chart-5: #ffe7cb;
+  --radius: 0.75rem;
+  --sidebar: #fffcf7;
+  --sidebar-foreground: #1a3533;
+  --sidebar-primary: #1a3533;
+  --sidebar-primary-foreground: #f9f7f2;
+  --sidebar-accent: #e7efed;
+  --sidebar-accent-foreground: #1a3533;
+  --sidebar-border: #d9e0de;
+  --sidebar-ring: #e89b6c;
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: #34d399;
-  --primary-foreground: #052e1f;
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
+  --brand-cream: #f9f7f2;
+  --brand-teal: #d5e4e1;
+  --brand-peach: #f0b089;
+  --brand-aqua: #7fb3ad;
+  --brand-sage: #8fad9a;
+  --brand-sun: #f3d2bc;
+  --background: #0f1c1b;
+  --foreground: #f2efe8;
+  --card: #162826;
+  --card-foreground: #f2efe8;
+  --popover: #162826;
+  --popover-foreground: #f2efe8;
+  --primary: #e89b6c;
+  --primary-foreground: #1a3533;
+  --secondary: #1f3331;
+  --secondary-foreground: #f2efe8;
+  --muted: #1f3331;
+  --muted-foreground: #a8b8b5;
+  --accent: #2a403d;
+  --accent-foreground: #f2efe8;
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: #34d399;
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 14%);
+  --ring: #e89b6c;
+  --chart-1: #e89b6c;
+  --chart-2: #a8cdc8;
+  --chart-3: #f2efe8;
+  --chart-4: #8fad9a;
+  --chart-5: #f0b089;
+  --sidebar: #162826;
+  --sidebar-foreground: #f2efe8;
+  --sidebar-primary: #e89b6c;
+  --sidebar-primary-foreground: #1a3533;
+  --sidebar-accent: #1f3331;
+  --sidebar-accent-foreground: #f2efe8;
+  --sidebar-border: oklch(1 0 0 / 12%);
+  --sidebar-ring: #e89b6c;
 }
 
 @layer base {
@@ -121,9 +158,18 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
+    min-height: 100dvh;
   }
-  html {
-    @apply font-sans;
+  /* Match autofill to brand surfaces — avoids grey/yellow browser defaults on inputs */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  textarea:-webkit-autofill,
+  textarea:-webkit-autofill:hover,
+  textarea:-webkit-autofill:focus {
+    -webkit-text-fill-color: var(--foreground);
+    -webkit-box-shadow: 0 0 0 1000px var(--background) inset;
+    transition: background-color 5000s ease-in-out 0s;
   }
 }

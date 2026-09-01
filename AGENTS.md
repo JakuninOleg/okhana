@@ -41,19 +41,32 @@ a simple calendar, and one real agentic tool-calling scenario.
 - Route configuration lives in `src/i18n/routing.ts`.
 
 ## Environments
-- **Local dev**: `okhana-dev` Supabase project + Clerk Development instance.
-  Webhooks are not testable here (Clerk cannot reach localhost).
-- **Preview** (Vercel, `staging` branch only): same `okhana-dev` database +
-  Clerk Development instance. This is where webhook and full-integration
-  testing happens, on a stable URL.
-- **Production**: separate `okhana` Supabase project + Clerk Production
-  instance. Never point local or staging config at these.
 
-## Git
-- Feature branches: `feature/description` or `fix/description`, branched from `staging`.
-- Merge order: `feature/*` → `staging` (integration testing on stable
-  Preview URL) → `main` (production).
-- Never commit directly to `main` or `staging`.
+### Database (single project)
+- **One Supabase Postgres project**: `okhana` (production). There is no separate
+  `okhana-dev` database.
+- **Local**, **Vercel Preview** (per-PR deploys), and **Production** (`master` →
+  okhanahome.com) all use the same `DATABASE_URL` (pooler `:6543`) and
+  `DIRECT_URL` (session `:5432`, migrations only).
+- **Implication**: migrations, seeds, and manual SQL affect real data. Review
+  `drizzle/` changes carefully; smoke-test on a Preview deploy before `master`.
+- **Never** commit connection strings. Copy values from the Supabase dashboard
+  into `.env.local` (local) and Vercel project env vars (Preview + Production).
+
+### Auth (Clerk)
+- **Local** (`localhost`): Clerk **Development** keys (`pk_test_` / `sk_test_`).
+  Webhooks cannot reach localhost — user sync via webhook is not testable locally.
+- **Preview** (Vercel Preview on each PR): Clerk Development instance +
+  production database. Use for webhook and full-integration testing.
+- **Production** (`okhanahome.com`): Clerk **Production** keys (`pk_live_` /
+  `sk_live_`) + production database.
+
+### Git
+- Feature branches: `feature/description` or `fix/description`, branched from `master`.
+- Merge order: `feature/*` → `master` via PR (Vercel Preview per PR).
+- The `staging` branch is **deprecated** after the PWA/mobile shell release — do not
+  branch from or merge into it going forward.
+- Never commit directly to `master`.
 - Conventional commits: `feat:`, `fix:`, `chore:`, `refactor:`, `test:`, `docs:`.
 - Atomic commits: one logical change per commit.
 

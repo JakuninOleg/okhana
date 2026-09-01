@@ -3,12 +3,21 @@ import { describe, it, expect, vi } from 'vitest';
 // Mock dependencies before importing proxy.ts — next-intl/middleware and
 // @clerk/nextjs/server both pull in next/server which doesn't resolve
 // correctly in the vitest Node environment.
+const mockIntlMiddleware = vi.hoisted(() => vi.fn(() => null));
 vi.mock('next-intl/middleware', () => ({
-  default: () => () => null,
+  default: () => mockIntlMiddleware,
 }));
 
+const mockClerkMiddlewareOptions = vi.hoisted(() => vi.fn());
 vi.mock('@clerk/nextjs/server', () => ({
-  clerkMiddleware: (handler: unknown) => handler,
+  clerkMiddleware: (handler: unknown, options: unknown) => {
+    mockClerkMiddlewareOptions(options);
+    return handler;
+  },
+}));
+
+vi.mock('next/server', () => ({
+  NextResponse: { next: () => 'next-response' },
 }));
 
 vi.mock('./i18n/routing', () => ({
@@ -25,6 +34,11 @@ describe('proxy.ts config', () => {
   it('matcher includes root route', async () => {
     const { config } = await import('./proxy');
     expect(config.matcher).toContain('/');
+  });
+
+  it('matcher includes api routes so Clerk auth context is available', async () => {
+    const { config } = await import('./proxy');
+    expect(config.matcher).toContain('/api/:path*');
   });
 
   it('matcher includes locale routes with path segments', async () => {
@@ -58,13 +72,47 @@ describe('proxy.ts config', () => {
 describe('proxy.ts handler', () => {
   type Handler = (auth: unknown, req: unknown) => unknown;
 
-  it('does not perform auth checks — delegates directly to intlMiddleware', async () => {
+  it('does not perform auth checks — delegates locale routes to intlMiddleware', async () => {
     const { default: handler } = await import('./proxy');
     const run = handler as unknown as Handler;
 
     // No auth.protect() call is made; passing a bare object (no `protect`
     // method) proves the handler never invokes it.
-    const result = run({}, {});
+    const result = run({}, { nextUrl: { pathname: '/ru/dashboard' } });
     expect(result).toBeNull();
+  });
+
+  it('skips intlMiddleware for api routes', async () => {
+    const { default: handler } = await import('./proxy');
+    const run = handler as unknown as Handler;
+
+    run({}, { nextUrl: { pathname: '/api/chat' } });
+
+    expect(mockIntlMiddleware).not.toHaveBeenCalledWith(
+      expect.objectContaining({ nextUrl: { pathname: '/api/chat' } }),
+    );
+  });
+});
+
+describe('proxy.ts Clerk options', () => {
+  it('authorizes origins without trailing slashes', async () => {
+    await import('./proxy');
+
+    expect(mockClerkMiddlewareOptions).toHaveBeenCalledWith(expect.objectContaining({
+      authorizedParties: expect.arrayContaining([
+        'https://okhana-git-staging-jakunin-olegs-projects.vercel.app',
+      ]),
+    }));
+  });
+
+  it('does not authorize origins with trailing slashes', async () => {
+    await import('./proxy');
+
+    const options = mockClerkMiddlewareOptions.mock.calls[0]?.[0] as {
+      authorizedParties?: string[];
+    };
+    expect(options.authorizedParties).not.toContain(
+      'https://okhana-git-staging-jakunin-olegs-projects.vercel.app/',
+    );
   });
 });

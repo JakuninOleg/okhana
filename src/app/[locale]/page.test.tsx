@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock auth() — returns userId or null depending on test scenario
-const mockAuth = vi.fn();
+const mockAuth = vi.hoisted(() => vi.fn());
 vi.mock('@clerk/nextjs/server', () => ({
   auth: () => mockAuth(),
 }));
@@ -10,15 +10,35 @@ vi.mock('@clerk/nextjs/server', () => ({
 vi.mock('next-intl/server', () => ({
   getTranslations: () =>
     Promise.resolve((key: string, vars?: Record<string, string>) => {
-      if (key === 'signIn') return 'Sign in';
-      if (key === 'greeting') return `Hello, ${vars?.email ?? ''}`;
-      if (key === 'signOut') return 'Sign out';
-      return key;
+      const map: Record<string, string> = {
+        brand: 'Okhana',
+        tagline: 'Family. Together. Always.',
+        headline: 'Your family hub, guided by AI',
+        pitch: 'Shared notes and a private assistant.',
+        signIn: 'Sign in',
+        signUp: 'Create account',
+        greeting: `Hello, ${vars?.email ?? ''}`,
+        signOut: 'Sign out',
+      };
+      return map[key] ?? key;
     }),
 }));
 
+vi.mock('next/image', () => ({
+  default: (props: { alt?: string; src: string; className?: string }) =>
+    React.createElement('img', { alt: props.alt ?? '', src: props.src, className: props.className }),
+}));
+
+vi.mock('@/components/ui/button', () => ({
+  buttonVariants: () => 'btn',
+}));
+
+vi.mock('@/lib/utils', () => ({
+  cn: (...parts: Array<string | undefined>) => parts.filter(Boolean).join(' '),
+}));
+
 // Mock redirect from i18n/navigation — capture calls instead of actually redirecting
-const mockRedirect = vi.fn();
+const mockRedirect = vi.hoisted(() => vi.fn());
 vi.mock('@/i18n/navigation', () => ({
   redirect: (...args: unknown[]) => mockRedirect(...args),
   Link: ({ children, href, className }: { children: React.ReactNode; href: string; className?: string }) =>
@@ -26,7 +46,7 @@ vi.mock('@/i18n/navigation', () => ({
 }));
 
 // Mock db query — returns user email or empty array
-const mockDbSelect = vi.fn();
+const mockDbSelect = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/server/db', () => ({
   db: {
     select: vi.fn(() => ({
@@ -71,7 +91,7 @@ describe('Home page', () => {
     });
   });
 
-  it('renders sign-in button for unauthenticated users', async () => {
+  it('renders public home content for unauthenticated users', async () => {
     mockAuth.mockResolvedValue({ userId: null });
 
     const { default: Home } = await import('./page');
@@ -81,8 +101,9 @@ describe('Home page', () => {
     }) as React.ReactElement;
 
     expect(mockRedirect).not.toHaveBeenCalled();
-    // The component renders a <main> with a link containing "Sign in"
     const html = renderToString(result);
+    expect(html).toContain('Okhana');
+    expect(html).toContain('Family. Together. Always.');
     expect(html).toContain('Sign in');
   });
 });
