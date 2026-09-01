@@ -24,7 +24,7 @@ describe('seo metadata', () => {
     });
 
     expect(meta.openGraph?.siteName).toBe('Okhana');
-    expect(meta.twitter?.card).toBe('summary_large_image');
+    expect(meta.twitter).toMatchObject({ card: 'summary_large_image' });
     expect(meta.alternates?.canonical).toBe(`${getSiteOrigin()}/en`);
     expect(absoluteUrl(brand.ogImagePath)).toContain('/brand/og-default.jpg');
   });
