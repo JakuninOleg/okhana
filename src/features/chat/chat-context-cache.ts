@@ -79,3 +79,7 @@ export function setCachedChatContext(
   cacheMap().set(clerkUserId, { ...context, cachedAt: Date.now() });
   enforceBound();
 }
+
+export function invalidateCachedChatContext(clerkUserId: string): void {
+  cacheMap().delete(clerkUserId);
+}

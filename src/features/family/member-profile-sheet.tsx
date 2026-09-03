@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useTransition } from 'react';
+import { useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import {
   ageFromBirthDate,
@@ -53,21 +53,16 @@ export function MemberProfileSheet({
 }: MemberProfileSheetProps): React.JSX.Element | null {
   const t = useTranslations('Dashboard.familyHub');
   const [errorKey, setErrorKey] = useState<string | null>(null);
-  const [isEditing, setIsEditing] = useState(false);
+  /** Editing is scoped to member id so closing/switching members exits edit without an effect. */
+  const [editingMemberId, setEditingMemberId] = useState<number | null>(null);
   const [isPending, startTransition] = useTransition();
-
-  useEffect(() => {
-    if (!open) {
-      setIsEditing(false);
-      setErrorKey(null);
-    }
-  }, [open]);
 
   if (!member) {
     return null;
   }
 
   const activeMember = member;
+  const isEditing = editingMemberId === activeMember.id;
   const label = memberDisplayLabel(activeMember);
   const actor = { userId: currentUserId, familyRole: currentUserRole };
   const canEdit = canEditMemberProfile(actor, {
@@ -105,6 +100,7 @@ export function MemberProfileSheet({
         setErrorKey(result.error);
         return;
       }
+      setEditingMemberId(null);
       onOpenChange(false);
     });
   }
@@ -117,6 +113,7 @@ export function MemberProfileSheet({
         setErrorKey(result.error);
         return;
       }
+      setEditingMemberId(null);
       onOpenChange(false);
     });
   }
@@ -129,12 +126,22 @@ export function MemberProfileSheet({
         setErrorKey(result.error);
         return;
       }
+      setEditingMemberId(null);
       onOpenChange(false);
     });
   }
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) {
+          setEditingMemberId(null);
+          setErrorKey(null);
+        }
+        onOpenChange(next);
+      }}
+    >
       <SheetContent side="right" className="w-full sm:max-w-md">
         <SheetHeader className="border-b border-border/60 pb-4">
           <div className="flex items-center gap-4">
@@ -178,7 +185,13 @@ export function MemberProfileSheet({
             ) : null}
 
             {canEdit ? (
-              <Button type="button" onClick={() => setIsEditing(true)}>
+              <Button
+                type="button"
+                onClick={() => {
+                  setErrorKey(null);
+                  setEditingMemberId(activeMember.id);
+                }}
+              >
                 {t('editMember')}
               </Button>
             ) : null}
@@ -281,7 +294,10 @@ export function MemberProfileSheet({
                 variant="outline"
                 className="flex-1"
                 disabled={isPending}
-                onClick={() => setIsEditing(false)}
+                onClick={() => {
+                  setErrorKey(null);
+                  setEditingMemberId(null);
+                }}
               >
                 {t('cancelEdit')}
               </Button>

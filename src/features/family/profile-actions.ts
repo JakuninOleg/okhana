@@ -4,6 +4,7 @@ import { auth } from '@clerk/nextjs/server';
 import { and, eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
+import { invalidateCachedChatContext } from '@/features/chat/chat-context-cache';
 import { invalidateDashboardFamilyCache } from '@/features/family/get-dashboard-family';
 import {
   KINSHIP_OPTIONS,
@@ -53,8 +54,10 @@ async function loadActor(clerkUserId: string) {
 
 function revalidateFamilyDashboard(clerkUserId: string, extraClerkIds: string[] = []): void {
   invalidateDashboardFamilyCache(clerkUserId);
+  invalidateCachedChatContext(clerkUserId);
   for (const id of extraClerkIds) {
     invalidateDashboardFamilyCache(id);
+    invalidateCachedChatContext(id);
   }
   revalidatePath('/[locale]/dashboard', 'page');
 }

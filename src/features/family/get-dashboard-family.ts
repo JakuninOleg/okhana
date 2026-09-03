@@ -1,6 +1,6 @@
 import { cache } from 'react';
 import { eq } from 'drizzle-orm';
-import { getCachedChatContext, setCachedChatContext } from '@/features/chat/chat-context-cache';
+import { getCachedChatContext, invalidateCachedChatContext, setCachedChatContext } from '@/features/chat/chat-context-cache';
 import type { DashboardFamilyMemberProfile } from '@/features/family/family-member-types';
 import {
   getCachedDashboardFamily,
@@ -48,6 +48,7 @@ async function queryDashboardFamily(clerkUserId: string): Promise<DashboardFamil
   const sync = await ensureDbUser(clerkUserId);
 
   if (!sync) {
+    invalidateCachedChatContext(clerkUserId);
     return {
       email: '',
       userDisplayName: '',
@@ -63,6 +64,8 @@ async function queryDashboardFamily(clerkUserId: string): Promise<DashboardFamil
   }
 
   if (!sync.familyId) {
+    // Removed / left family: drop stale AI tool context so chat cannot keep acting in-family.
+    invalidateCachedChatContext(clerkUserId);
     return {
       email: sync.email,
       userDisplayName: sync.displayName ?? sync.name ?? sync.email.split('@')[0] ?? '',
