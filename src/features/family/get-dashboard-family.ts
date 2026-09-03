@@ -1,6 +1,7 @@
 import { cache } from 'react';
 import { eq } from 'drizzle-orm';
 import { getCachedChatContext, setCachedChatContext } from '@/features/chat/chat-context-cache';
+import type { DashboardFamilyMemberProfile } from '@/features/family/family-member-types';
 import {
   getCachedDashboardFamily,
   setCachedDashboardFamily,
@@ -15,68 +16,138 @@ import { ensureDbUser } from '@/lib/server/users/ensure-db-user';
 export type { DashboardFamilyData, DashboardFamilyMember };
 export { invalidateDashboardFamilyCache } from '@/features/family/family-cache';
 
+function mapMemberRow(
+  member: {
+    id: number;
+    email: string;
+    name: string | null;
+    displayName: string | null;
+    familyRole: 'owner' | 'adult' | 'child' | null;
+    kinshipLabel: string | null;
+    profileSex: 'female' | 'male' | 'unspecified';
+    birthDate: string | null;
+    profileColor: string | null;
+  },
+  currentUserId: number | null,
+): DashboardFamilyMemberProfile {
+  return {
+    id: member.id,
+    email: member.email,
+    name: member.name,
+    displayName: member.displayName,
+    familyRole: member.familyRole,
+    kinshipLabel: member.kinshipLabel,
+    profileSex: member.profileSex,
+    birthDate: member.birthDate,
+    profileColor: member.profileColor,
+    isCurrentUser: currentUserId === member.id,
+  };
+}
+
 async function queryDashboardFamily(clerkUserId: string): Promise<DashboardFamilyData> {
-  // Clerk API + user sync must stay outside the DB mutex — withDbRetry serializes
-  // all Postgres access and nested calls deadlocked here (4s query timeouts).
   const sync = await ensureDbUser(clerkUserId);
 
+  if (!sync) {
+    return {
+      email: '',
+      userDisplayName: '',
+      familyName: null,
+      familyId: null,
+      inviteCode: null,
+      hasFamily: false,
+      currentUserId: null,
+      currentUserRole: null,
+      members: [],
+      dbError: null,
+    };
+  }
+
+  if (!sync.familyId) {
+    return {
+      email: sync.email,
+      userDisplayName: sync.displayName ?? sync.name ?? sync.email.split('@')[0] ?? '',
+      familyName: null,
+      familyId: null,
+      inviteCode: null,
+      hasFamily: false,
+      currentUserId: sync.id,
+      currentUserRole: sync.familyRole,
+      members: [],
+      dbError: null,
+    };
+  }
+
+  const familyId = sync.familyId;
+
   return withDbRetry(async () => {
-    const [result] = await db
+    // Sequential on purpose: transaction pooler + max:1 cannot run Promise.all
+    // safely — concurrent queries destroy the socket (CONNECTION_DESTROYED).
+    const [family] = await db
       .select({
-        userId: users.id,
-        email: users.email,
-        familyRole: users.familyRole,
-        familyId: families.id,
+        id: families.id,
         familyName: families.name,
         inviteCode: families.inviteCode,
       })
-      .from(users)
-      .leftJoin(families, eq(users.familyId, families.id))
-      .where(eq(users.clerkId, clerkUserId))
+      .from(families)
+      .where(eq(families.id, familyId))
       .limit(1);
 
-    const familyId = result?.familyId ?? sync?.familyId ?? null;
-    const hasFamily = result?.familyName != null;
+    const memberRows = await db
+      .select({
+        id: users.id,
+        email: users.email,
+        name: users.name,
+        displayName: users.displayName,
+        familyRole: users.familyRole,
+        kinshipLabel: users.kinshipLabel,
+        profileSex: users.profileSex,
+        birthDate: users.birthDate,
+        profileColor: users.profileColor,
+      })
+      .from(users)
+      .where(eq(users.familyId, familyId));
 
-    const members = hasFamily && familyId
-      ? await db
-        .select({
-          id: users.id,
-          email: users.email,
-          name: users.name,
-          familyRole: users.familyRole,
-        })
-        .from(users)
-        .where(eq(users.familyId, familyId))
-      : [];
+    const hasFamily = family != null;
+    const members = memberRows
+      .map((row) => mapMemberRow(row, sync.id))
+      .sort((a, b) => Number(b.isCurrentUser) - Number(a.isCurrentUser));
+    const currentMember = members.find((member) => member.isCurrentUser);
+    const userDisplayName = currentMember?.displayName
+      ?? currentMember?.name
+      ?? sync.displayName
+      ?? sync.name
+      ?? sync.email.split('@')[0]
+      ?? '';
 
-    if (result?.userId && familyId && result.familyRole) {
+    if (hasFamily && sync.familyRole) {
       const existing = getCachedChatContext(clerkUserId);
       setCachedChatContext(clerkUserId, {
         familyId,
-        userId: result.userId,
-        familyRole: result.familyRole,
+        userId: sync.id,
+        familyRole: sync.familyRole,
         conversationId: existing?.conversationId ?? null,
         isNewConversation: existing?.isNewConversation ?? true,
         familyMembers: members.map((member) => ({
           id: member.id,
-          name: member.name,
+          name: member.displayName ?? member.name,
           email: member.email,
           role: member.familyRole,
+          kinshipLabel: member.kinshipLabel,
+          birthDate: member.birthDate,
         })),
       });
     }
 
     return {
-      email: result?.email ?? sync?.email ?? '',
-      familyName: result?.familyName ?? null,
-      familyId,
-      inviteCode: result?.inviteCode ?? null,
+      email: sync.email,
+      userDisplayName,
+      familyName: family?.familyName ?? null,
+      familyId: hasFamily ? familyId : null,
+      inviteCode: family?.inviteCode ?? null,
       hasFamily,
-      members: members.map((member) => ({
-        email: member.email,
-        familyRole: member.familyRole,
-      })),
+      currentUserId: sync.id,
+      currentUserRole: sync.familyRole,
+      members: hasFamily ? members : [],
       dbError: null,
     };
   });
@@ -99,10 +170,13 @@ export const getDashboardFamilyData = cache(async (clerkUserId: string): Promise
     });
     return {
       email: '',
+      userDisplayName: '',
       familyName: null,
       familyId: null,
       inviteCode: null,
       hasFamily: false,
+      currentUserId: null,
+      currentUserRole: null,
       members: [],
       dbError: 'Database temporarily unavailable. Try again shortly.',
     };

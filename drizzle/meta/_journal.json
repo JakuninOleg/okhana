@@ -8,6 +8,13 @@
       "when": 1784230672462,
       "tag": "0000_keen_diamondback",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1788447307100,
+      "tag": "0001_smart_loki",
+      "breakpoints": true
     }
   ]
 }

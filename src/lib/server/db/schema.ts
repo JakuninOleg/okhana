@@ -1,11 +1,12 @@
 import {
-  pgTable, serial, varchar, integer, timestamp,
+  pgTable, serial, varchar, integer, timestamp, date,
   boolean, text, jsonb, pgEnum, index, type AnyPgColumn
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
 // Enums (only used ones)
 export const familyRoleEnum = pgEnum('family_role', ['owner', 'adult', 'child']);
+export const profileSexEnum = pgEnum('profile_sex', ['female', 'male', 'unspecified']);
 export const privacyLevelEnum = pgEnum('privacy_level', ['public', 'adults_only', 'personal']);
 export const noteCategoryEnum = pgEnum('note_category', ['general', 'document', 'medical', 'finance', 'reminder']);
 export const messageRoleEnum = pgEnum('message_role', ['user', 'assistant', 'system']);
@@ -19,6 +20,14 @@ export const users = pgTable('users', {
   avatarUrl: varchar('avatar_url', { length: 500 }),
   familyId: integer('family_id').references((): AnyPgColumn => families.id, { onDelete: 'set null' }),
   familyRole: familyRoleEnum('family_role'),
+  /** How the family addresses this person ("Мама", "Саша") — separate from Clerk name. */
+  displayName: varchar('display_name', { length: 255 }),
+  birthDate: date('birth_date'),
+  profileSex: profileSexEnum('profile_sex').default('unspecified').notNull(),
+  /** Social label: mom, dad, son, etc. Permissions stay in familyRole. */
+  kinshipLabel: varchar('kinship_label', { length: 64 }),
+  /** Hex color for calendar chips, e.g. #E89B6C */
+  profileColor: varchar('profile_color', { length: 7 }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [
   index('users_clerk_id_idx').on(table.clerkId),

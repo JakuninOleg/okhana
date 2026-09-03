@@ -12,6 +12,8 @@ export type CachedChatContext = {
     name: string | null;
     email: string;
     role: FamilyRole | null;
+    kinshipLabel: string | null;
+    birthDate: string | null;
   }>;
   cachedAt: number;
 };

@@ -7,9 +7,13 @@ dns.setDefaultResultOrder('ipv4first');
 const isDev = process.env.NODE_ENV === 'development';
 const isServerless = Boolean(process.env.VERCEL);
 
-/** Fail fast — hung pooler sockets otherwise block chat for minutes. */
-const ATTEMPT_TIMEOUT_MS = 4_000;
-const MAX_CONNECTION_AGE_MS = 20_000;
+/**
+ * Per-attempt SQL budget. Hung pooler sockets are reset and retried.
+ * Keep this modest — a dead connection should fail fast, not block the mutex.
+ */
+const ATTEMPT_TIMEOUT_MS = isDev && !isServerless ? 6_000 : 4_000;
+const MAX_ATTEMPTS = 3;
+const MAX_CONNECTION_AGE_MS = isDev && !isServerless ? 45_000 : 20_000;
 
 type Sql = ReturnType<typeof postgres>;
 
@@ -43,11 +47,12 @@ function createSql(): Sql {
 
   const sql = postgres(connectionString, {
     max: 1,
-    idle_timeout: 10,
-    connect_timeout: 3,
-    max_lifetime: 30,
+    idle_timeout: isDev && !isServerless ? 120 : 30,
+    connect_timeout: 8,
+    max_lifetime: 60,
     prepare: false,
-    ...(usingTransactionPooler ? { max_pipeline: 1 } : {}),
+    // Transaction pooler cannot safely pipeline concurrent queries on one socket.
+    ...(usingTransactionPooler ? { max_pipeline: 1, fetch_types: false } : {}),
     ...(isDev && !isServerless ? { onnotice: () => undefined } : {}),
   });
 
@@ -100,14 +105,33 @@ async function recycleAgedConnection(): Promise<void> {
 
 function walkErrorChain(error: unknown): Array<{ code: string; message: string }> {
   const parts: Array<{ code: string; message: string }> = [];
-  let current: unknown = error;
-  for (let depth = 0; depth < 5 && current && typeof current === 'object'; depth += 1) {
+  const queue: unknown[] = [error];
+  const seen = new Set<unknown>();
+
+  while (queue.length > 0 && parts.length < 12) {
+    const current = queue.shift();
+    if (!current || typeof current !== 'object' || seen.has(current)) {
+      continue;
+    }
+    seen.add(current);
+
     parts.push({
       code: 'code' in current ? String(current.code) : '',
-      message: 'message' in current ? String(current.message) : '',
+      message: 'message' in current
+        ? String(current.message)
+        : String(current),
     });
-    current = 'cause' in current ? current.cause : undefined;
+
+    if ('cause' in current && current.cause) {
+      queue.push(current.cause);
+    }
+    if ('errors' in current && Array.isArray(current.errors)) {
+      for (const nested of current.errors) {
+        queue.push(nested);
+      }
+    }
   }
+
   return parts;
 }
 
@@ -124,27 +148,37 @@ export function isRetriableConnectionError(error: unknown): boolean {
     ) {
       return true;
     }
-    return /ECONNRESET|ETIMEDOUT|EMAXCONN|max clients reached|connection (?:closed|terminated|destroyed|refused)|CONNECT_TIMEOUT|timeout expired|query timeout/i
+    return /ECONNRESET|ETIMEDOUT|EMAXCONN|CONNECTION_DESTROYED|CONNECTION_CLOSED|max clients reached|connection (?:closed|terminated|destroyed|refused)|CONNECT_TIMEOUT|timeout expired|query timeout|write CONNECTION/i
       .test(message);
   });
 }
 
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return new Promise<T>((resolve, reject) => {
+    let settled = false;
     const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
       reject(Object.assign(new Error(`Query timeout after ${ms}ms`), { code: 'QUERY_TIMEOUT' }));
     }, ms);
 
     promise.then(
       (value) => {
+        if (settled) return;
+        settled = true;
         clearTimeout(timer);
         resolve(value);
       },
       (error: unknown) => {
+        if (settled) return;
+        settled = true;
         clearTimeout(timer);
         reject(error);
       },
     );
+
+    // After we give up, still attach a no-op so late pooler errors are not unhandled.
+    void promise.catch(() => undefined);
   });
 }
 
@@ -164,22 +198,27 @@ async function withMutex<T>(operation: () => Promise<T>): Promise<T> {
 }
 
 /**
- * One timed attempt + one reconnect. Serialized in-process so hung sockets
- * cannot stack up and block every later request.
+ * Timed attempts with reconnect. Serialized so the single pooler socket
+ * never runs concurrent queries (Supabase transaction pooler + max:1).
  */
 export async function withDbRetry<T>(operation: () => Promise<T>): Promise<T> {
   return withMutex(async () => {
     await recycleAgedConnection();
-    const run = (): Promise<T> => withTimeout(operation(), ATTEMPT_TIMEOUT_MS);
 
-    try {
-      return await run();
-    } catch (error) {
-      if (!isRetriableConnectionError(error)) {
-        throw error;
+    let lastError: unknown;
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
+      try {
+        const result = await withTimeout(operation(), ATTEMPT_TIMEOUT_MS);
+        return result;
+      } catch (error) {
+        lastError = error;
+        if (!isRetriableConnectionError(error) || attempt === MAX_ATTEMPTS - 1) {
+          throw error;
+        }
+        await resetSql();
       }
-      await resetSql();
-      return run();
     }
+
+    throw lastError;
   });
 }

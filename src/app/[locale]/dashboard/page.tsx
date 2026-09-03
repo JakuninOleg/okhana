@@ -1,4 +1,4 @@
-import { auth, clerkClient } from '@clerk/nextjs/server';
+import { auth } from '@clerk/nextjs/server';
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 import { FamilyHubMenu } from '@/features/family/family-hub-menu';
@@ -45,34 +45,22 @@ export default async function DashboardPage({
   let familyName: string | null = null;
   let inviteCode: string | null = null;
   let hasFamily = false;
-  let members: { email: string; familyRole: string | null }[] = [];
+  let currentUserId: number | null = null;
+  let currentUserRole: 'owner' | 'adult' | 'child' | null = null;
+  let members: Awaited<ReturnType<typeof getDashboardFamilyData>>['members'] = [];
   let dbError: string | null = null;
 
   if (userId) {
     const data = await getDashboardFamilyData(userId);
     email = data.email;
+    displayName = data.userDisplayName;
     familyName = data.familyName;
     inviteCode = data.inviteCode;
     hasFamily = data.hasFamily;
+    currentUserId = data.currentUserId;
+    currentUserRole = (data.currentUserRole as typeof currentUserRole) ?? null;
     members = data.members;
     dbError = data.dbError;
-
-    try {
-      const client = await clerkClient();
-      const clerkUser = await client.users.getUser(userId);
-      if (!email) {
-        email = clerkUser.emailAddresses[0]?.emailAddress ?? '';
-      }
-      displayName =
-        clerkUser.firstName
-        ?? email.split('@')[0]
-        ?? email;
-    } catch (error) {
-      console.error('Failed to fetch user from Clerk API:', error);
-      if (email) {
-        displayName = email.split('@')[0] ?? email;
-      }
-    }
   }
 
   if (!displayName && email) {
@@ -119,18 +107,16 @@ export default async function DashboardPage({
   }
 
   return (
-    <main className="flex min-h-0 flex-1 flex-col gap-3 py-3 sm:gap-4 sm:py-4">
+    <main className="flex min-h-0 flex-1 flex-col py-3 sm:py-4">
       <FamilyHubMenu
         familyName={familyName!}
         inviteCode={inviteCode!}
         members={members}
-        displayName={displayName}
-        userEmail={email}
-      />
-
-      <div className="flex min-h-0 flex-1 flex-col">
+        currentUserId={currentUserId!}
+        currentUserRole={currentUserRole!}
+      >
         <FamilyChatLoader />
-      </div>
+      </FamilyHubMenu>
     </main>
   );
 }
