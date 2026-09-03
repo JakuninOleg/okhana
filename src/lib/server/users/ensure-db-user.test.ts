@@ -4,6 +4,7 @@ const mockClerkGetUser = vi.hoisted(() => vi.fn());
 const mockSelectLimit = vi.hoisted(() => vi.fn());
 const mockUpdateReturning = vi.hoisted(() => vi.fn());
 const mockInsertReturning = vi.hoisted(() => vi.fn());
+const mockDeleteWhere = vi.hoisted(() => vi.fn(async () => undefined));
 const mockInvalidateDashboardFamilyCache = vi.hoisted(() => vi.fn());
 
 vi.mock('@clerk/nextjs/server', () => ({
@@ -31,6 +32,8 @@ vi.mock('@/lib/server/db/schema', () => ({
 
 vi.mock('drizzle-orm', () => ({
   eq: vi.fn(),
+  and: vi.fn(),
+  ne: vi.fn(),
 }));
 
 vi.mock('@/lib/server/db/client', () => ({
@@ -59,6 +62,9 @@ vi.mock('@/lib/server/db', () => ({
           returning: vi.fn(() => mockInsertReturning()),
         })),
       })),
+    })),
+    delete: vi.fn(() => ({
+      where: vi.fn(() => mockDeleteWhere()),
     })),
   },
 }));
@@ -92,7 +98,8 @@ describe('ensureDbUser', () => {
         email: 'oleg@example.com',
         familyId: 1,
         familyRole: 'owner',
-      }]);
+      }])
+      .mockResolvedValueOnce([]);
 
     mockClerkGetUser.mockResolvedValue({
       emailAddresses: [{ emailAddress: 'oleg@example.com' }],

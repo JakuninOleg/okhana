@@ -1,14 +1,33 @@
 import type { Locale } from '@/i18n/routing';
+import { ageFromBirthDate } from '@/features/family/family-member-types';
 
 const localeLanguageName = {
   ru: 'Russian',
   en: 'English',
 } satisfies Record<Locale, string>;
 
+type FamilyMemberContext = {
+  id: number;
+  name: string | null;
+  email: string;
+  role: string | null;
+  kinshipLabel?: string | null;
+  birthDate?: string | null;
+};
+
+function formatMemberForPrompt(member: FamilyMemberContext): string {
+  const display = member.name?.trim() || member.email.split('@')[0] || `member-${member.id}`;
+  const kinship = member.kinshipLabel ?? 'unspecified';
+  const role = member.role ?? 'unknown';
+  const age = ageFromBirthDate(member.birthDate ?? null);
+  const agePart = age === null ? 'age-unknown' : `age-${age}`;
+  return `${member.id}:${display}:${kinship}:${role}:${agePart}`;
+}
+
 export function buildSystemPrompt(input: {
   locale: Locale;
   familyRole: string;
-  familyMembers: { id: number; name: string | null; email: string; role: string | null }[];
+  familyMembers: FamilyMemberContext[];
   isNewConversation: boolean;
 }): string {
   const introInstruction = input.isNewConversation
@@ -25,6 +44,6 @@ export function buildSystemPrompt(input: {
     'Use search_notes before saying you do not know, when the answer may depend on saved family notes.',
     'If a note privacy level or hidden-from list is ambiguous, ask a short clarification before saving sensitive information.',
     'Never claim to see private notes that are not returned by search_notes; note search results are already filtered by database permissions.',
-    `Current user role: ${input.familyRole}. Family members: ${input.familyMembers.map((member) => `${member.id}:${member.name ?? `member-${member.id}`}(${member.role ?? 'unknown'})`).join(', ')}.`,
+    `Current user role: ${input.familyRole}. Family members (id:displayName:kinship:role:age): ${input.familyMembers.map(formatMemberForPrompt).join(', ')}.`,
   ].join('\n');
 }

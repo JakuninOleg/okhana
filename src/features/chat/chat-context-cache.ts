@@ -12,6 +12,8 @@ export type CachedChatContext = {
     name: string | null;
     email: string;
     role: FamilyRole | null;
+    kinshipLabel: string | null;
+    birthDate: string | null;
   }>;
   cachedAt: number;
 };
@@ -76,4 +78,8 @@ export function setCachedChatContext(
   pruneExpired();
   cacheMap().set(clerkUserId, { ...context, cachedAt: Date.now() });
   enforceBound();
+}
+
+export function invalidateCachedChatContext(clerkUserId: string): void {
+  cacheMap().delete(clerkUserId);
 }

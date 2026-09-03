@@ -50,6 +50,8 @@ type ChatContextOk = {
     name: string | null;
     email: string;
     role: typeof users.$inferSelect.familyRole;
+    kinshipLabel: string | null;
+    birthDate: string | null;
   }>;
 };
 
@@ -76,7 +78,14 @@ async function loadChatContextFromDb(clerkUserId: string): Promise<ChatContextOk
     }
 
     const familyMembers = await db
-      .select({ id: users.id, name: users.name, email: users.email, role: users.familyRole })
+      .select({
+        id: users.id,
+        name: users.displayName,
+        email: users.email,
+        role: users.familyRole,
+        kinshipLabel: users.kinshipLabel,
+        birthDate: users.birthDate,
+      })
       .from(users)
       .where(eq(users.familyId, dbUser.familyId));
 
@@ -112,6 +121,8 @@ async function loadChatContextFromDb(clerkUserId: string): Promise<ChatContextOk
         name: member.name,
         email: member.email,
         role: member.role,
+        kinshipLabel: member.kinshipLabel,
+        birthDate: member.birthDate,
       })),
     } satisfies Omit<CachedChatContext, 'cachedAt'>);
 

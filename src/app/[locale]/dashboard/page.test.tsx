@@ -59,10 +59,12 @@ vi.mock('@/features/family/family-hub-menu', () => ({
   FamilyHubMenu: ({
     familyName,
     inviteCode,
+    children,
   }: {
     familyName: string;
     inviteCode: string;
-  }) => React.createElement('div', null, familyName, inviteCode),
+    children?: React.ReactNode;
+  }) => React.createElement('div', null, familyName, inviteCode, children),
 }));
 
 vi.mock('@/features/family/family-setup-form', () => ({
@@ -95,10 +97,13 @@ describe('Dashboard page', () => {
     vi.clearAllMocks();
     mockGetDashboardFamilyData.mockResolvedValue({
       email: 'test@example.com',
+      userDisplayName: 'test',
       familyName: null,
       familyId: null,
       inviteCode: null,
       hasFamily: false,
+      currentUserId: null,
+      currentUserRole: null,
       members: [],
       dbError: null,
     });
@@ -117,14 +122,17 @@ describe('Dashboard page', () => {
     expect(html).toContain('Family setup');
   });
 
-  it('falls back to Clerk API when user not found in db', async () => {
+  it('uses display name from dashboard family data', async () => {
     mockAuth.mockResolvedValue({ userId: 'user_123' });
     mockGetDashboardFamilyData.mockResolvedValue({
       email: '',
+      userDisplayName: 'fallback',
       familyName: null,
       familyId: null,
       inviteCode: null,
       hasFamily: false,
+      currentUserId: null,
+      currentUserRole: null,
       members: [],
       dbError: null,
     });
@@ -142,10 +150,13 @@ describe('Dashboard page', () => {
     mockAuth.mockResolvedValue({ userId: 'user_123' });
     mockGetDashboardFamilyData.mockResolvedValue({
       email: '',
+      userDisplayName: '',
       familyName: null,
       familyId: null,
       inviteCode: null,
       hasFamily: false,
+      currentUserId: null,
+      currentUserRole: null,
       members: [],
       dbError: 'Connection refused',
     });
@@ -175,10 +186,13 @@ describe('Dashboard page', () => {
     mockAuth.mockResolvedValue({ userId: 'user_123' });
     mockGetDashboardFamilyData.mockResolvedValue({
       email: 'test@example.com',
+      userDisplayName: 'test',
       familyName: 'Smiths',
       familyId: 7,
       inviteCode: 'ABCD2345',
       hasFamily: true,
+      currentUserId: 1,
+      currentUserRole: 'owner',
       members: [],
       dbError: null,
     });

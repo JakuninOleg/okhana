@@ -40,6 +40,32 @@ describe('withDbRetry', () => {
     expect(operation).toHaveBeenCalledTimes(2);
   });
 
+  it('reconnects once after CONNECTION_DESTROYED in message', async () => {
+    const { withDbRetry } = await import('./client');
+    const dead = new Error('write CONNECTION_DESTROYED aws-1-us-east-2.pooler.supabase.com:6543');
+    const operation = vi
+      .fn()
+      .mockRejectedValueOnce(dead)
+      .mockResolvedValueOnce('ok');
+
+    await expect(withDbRetry(operation)).resolves.toBe('ok');
+    expect(operation).toHaveBeenCalledTimes(2);
+  });
+
+  it('resets and retries once after query deadline', async () => {
+    const { getSql, withDbRetry } = await import('./client');
+    getSql();
+    const deadline = Object.assign(new Error('Query timeout after 5000ms'), { code: 'QUERY_TIMEOUT' });
+    const operation = vi
+      .fn()
+      .mockRejectedValueOnce(deadline)
+      .mockResolvedValueOnce('ok');
+
+    await expect(withDbRetry(operation)).resolves.toBe('ok');
+    expect(operation).toHaveBeenCalledTimes(2);
+    expect(mockEnd).toHaveBeenCalled();
+  });
+
   it('does not retry non-connection Failed query errors', async () => {
     const { withDbRetry } = await import('./client');
     const error = Object.assign(new Error('Failed query: insert'), {

@@ -1,14 +1,16 @@
-export type DashboardFamilyMember = {
-  email: string;
-  familyRole: string | null;
-};
+import type { DashboardFamilyMemberProfile } from '@/features/family/family-member-types';
+
+export type DashboardFamilyMember = DashboardFamilyMemberProfile;
 
 export type DashboardFamilyData = {
   email: string;
+  userDisplayName: string;
   familyName: string | null;
   familyId: number | null;
   inviteCode: string | null;
   hasFamily: boolean;
+  currentUserId: number | null;
+  currentUserRole: string | null;
   members: DashboardFamilyMember[];
   dbError: string | null;
 };
