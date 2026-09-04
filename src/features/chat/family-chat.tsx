@@ -128,11 +128,7 @@ export function FamilyChat(): React.JSX.Element {
     if (!list) {
       return;
     }
-    // Desktop: list is the overflow scroller. Mobile: page scrolls — use scrollIntoView.
-    if (typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches) {
-      list.scrollTop = list.scrollHeight;
-      return;
-    }
+    // Page/column scroll (mobile + desktop) — avoid nested chat scrollports.
     const last = list.lastElementChild;
     last?.scrollIntoView({ block: 'end' });
   });
@@ -375,10 +371,8 @@ export function FamilyChat(): React.JSX.Element {
       <Card
         className={cn(
           'flex w-full flex-1 flex-col gap-0 border-border/60 bg-card/90 py-0 shadow-sm backdrop-blur-sm',
-          // Mobile: let the page scroll — nested chat scroll trapped touches.
-          'max-lg:overflow-visible',
-          // Desktop: fixed-height panel with inner message scroll.
-          'lg:h-full lg:min-h-[28rem] lg:overflow-hidden',
+          // No nested chat scrollport — mobile uses page scroll; desktop uses the hub column.
+          'overflow-visible',
         )}
       >
         <CardHeader className="shrink-0 gap-3 border-b border-border/60 px-4 py-3 sm:px-5 sm:py-4">
@@ -425,14 +419,10 @@ export function FamilyChat(): React.JSX.Element {
           </div>
         </CardHeader>
 
-        <CardContent className="flex flex-1 flex-col px-0 py-0 lg:min-h-0">
+        <CardContent className="flex flex-1 flex-col px-0 py-0">
           <div
             ref={listRef}
-            className={cn(
-              'space-y-5 px-4 py-4 sm:px-5 sm:py-5',
-              'max-lg:overflow-visible',
-              'lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:overscroll-contain',
-            )}
+            className="space-y-5 overflow-visible px-4 py-4 sm:px-5 sm:py-5"
             aria-live="polite"
           >
             {status === 'loadingHistory' ? (

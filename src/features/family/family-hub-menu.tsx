@@ -207,7 +207,7 @@ export function FamilyHubMenu({
         </div>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col gap-3 lg:min-h-0">
+      <div className="flex min-w-0 flex-1 flex-col gap-3 lg:min-h-0 lg:overflow-y-auto">
         <section className="shrink-0 rounded-2xl border border-border/60 bg-card/80 p-3 shadow-sm backdrop-blur-sm sm:p-4 lg:hidden">
           <div className="mb-3 flex items-center justify-between gap-2">
             <div className="min-w-0">
@@ -234,7 +234,8 @@ export function FamilyHubMenu({
           </ul>
         </section>
 
-        <div className="flex flex-1 flex-col gap-3 lg:min-h-0">{children}</div>
+        {/* Natural height children — desktop scrolls this column; mobile scrolls the page. */}
+        <div className="flex flex-col gap-3">{children}</div>
       </div>
 
       <MemberProfileSheet
