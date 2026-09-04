@@ -57,7 +57,7 @@ describe('task-actions', () => {
     const { loadMyTasksAction } = await load();
     await expect(loadMyTasksAction('active')).resolves.toEqual({
       ok: false,
-      error: 'Unauthorized',
+      error: 'unauthorized',
     });
   });
 
@@ -67,7 +67,7 @@ describe('task-actions', () => {
     const { loadMyTasksAction } = await load();
     await expect(loadMyTasksAction()).resolves.toEqual({
       ok: false,
-      error: 'Unauthorized',
+      error: 'unauthorized',
     });
   });
 
@@ -113,7 +113,7 @@ describe('task-actions', () => {
 
     await expect(completeTaskAction(9)).resolves.toEqual({
       ok: false,
-      error: 'Task not found',
+      error: 'not_found',
     });
   });
 });

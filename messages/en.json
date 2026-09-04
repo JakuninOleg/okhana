@@ -158,6 +158,14 @@
         "seen": "Seen",
         "done": "Done",
         "cancelled": "Cancelled"
+      },
+      "errors": {
+        "unauthorized": "Sign in again to see your tasks.",
+        "not_found": "Task not found.",
+        "cancelled": "This task was cancelled.",
+        "ack_blocked": "This task can no longer be marked as seen.",
+        "complete_blocked": "This task can no longer be completed.",
+        "generic": "Something went wrong. Try again."
       }
     }
   }

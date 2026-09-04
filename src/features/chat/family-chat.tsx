@@ -347,31 +347,31 @@ export function FamilyChat(): React.JSX.Element {
         <CardHeader className="shrink-0 gap-3 border-b border-border/60 px-4 py-3 sm:px-5 sm:py-4">
           <div className="flex items-start gap-3">
             <OkhanaAvatar size="lg" label={t('assistantName')} />
-            <div className="min-w-0 flex-1 space-y-1">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0 space-y-1">
-                  <p className="text-[0.7rem] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-                    {t('eyebrow')}
-                  </p>
-                  <CardTitle className="text-lg tracking-tight sm:text-xl">{t('title')}</CardTitle>
-                  <CardDescription className="hidden sm:block">{t('description')}</CardDescription>
-                </div>
-                {locale === 'en' ? (
-                  <div className="flex shrink-0 items-center gap-2 rounded-xl border border-border/60 bg-muted/30 px-2.5 py-1.5">
-                    <Volume2 className="size-3.5 text-muted-foreground" aria-hidden />
-                    <Label htmlFor="okhana-tts-toggle" className="text-xs text-muted-foreground">
-                      {t('ttsToggle')}
-                    </Label>
-                    <Switch
-                      id="okhana-tts-toggle"
-                      checked={ttsEnabled}
-                      onCheckedChange={(checked) => setTtsEnabled(checked, 'en')}
-                      aria-label={t('ttsToggle')}
-                    />
-                  </div>
-                ) : null}
+            <div className="min-w-0 flex-1 space-y-2">
+              <div className="space-y-1">
+                <p className="text-[0.7rem] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                  {t('eyebrow')}
+                </p>
+                <CardTitle className="text-lg leading-snug tracking-tight text-balance sm:text-xl">
+                  {t('title')}
+                </CardTitle>
+                <CardDescription className="hidden sm:block">{t('description')}</CardDescription>
               </div>
-              <div className="flex flex-wrap items-center gap-2 pt-1">
+              {locale === 'en' ? (
+                <div className="flex w-fit max-w-full items-center gap-2 rounded-xl border border-border/60 bg-muted/30 px-2.5 py-1.5">
+                  <Volume2 className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                  <Label htmlFor="okhana-tts-toggle" className="text-xs text-muted-foreground">
+                    {t('ttsToggle')}
+                  </Label>
+                  <Switch
+                    id="okhana-tts-toggle"
+                    checked={ttsEnabled}
+                    onCheckedChange={(checked) => setTtsEnabled(checked, 'en')}
+                    aria-label={t('ttsToggle')}
+                  />
+                </div>
+              ) : null}
+              <div className="flex flex-wrap items-center gap-2">
                 <p className="text-xs text-muted-foreground" aria-live="polite">
                   {statusLine}
                 </p>
