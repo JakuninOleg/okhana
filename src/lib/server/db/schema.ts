@@ -116,6 +116,32 @@ export const familyTaskAssignees = pgTable('family_task_assignees', {
   index('family_task_assignees_task_idx').on(table.taskId),
 ]);
 
+/** Recurring family dates (anniversaries etc.) — materialize into `events` when calendar ships. */
+export const familyDateKindEnum = pgEnum('family_date_kind', [
+  'anniversary',
+  'birthday',
+  'holiday',
+  'other',
+]);
+
+export const familyDates = pgTable('family_dates', {
+  id: serial('id').primaryKey(),
+  familyId: integer('family_id').notNull().references(() => families.id, { onDelete: 'cascade' }),
+  title: varchar('title', { length: 255 }).notNull(),
+  kind: familyDateKindEnum('kind').default('other').notNull(),
+  /** Recurring calendar month (1–12). */
+  month: integer('month').notNull(),
+  /** Recurring calendar day (1–31). */
+  day: integer('day').notNull(),
+  /** Optional original year (wedding year, birth year) for “N years ago”. */
+  year: integer('year'),
+  notes: text('notes'),
+  createdBy: integer('created_by').references(() => users.id, { onDelete: 'set null' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  index('family_dates_family_md_idx').on(table.familyId, table.month, table.day),
+]);
+
 /** Web Push endpoints per device (PWA notifications for tasks). */
 export const pushSubscriptions = pgTable('push_subscriptions', {
   id: serial('id').primaryKey(),
@@ -164,6 +190,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   createdNotes: many(notes),
   createdEvents: many(events),
   createdTasks: many(familyTasks),
+  createdFamilyDates: many(familyDates),
   taskAssignments: many(familyTaskAssignees),
   pushSubscriptions: many(pushSubscriptions),
   conversations: many(aiConversations),
@@ -175,7 +202,13 @@ export const familiesRelations = relations(families, ({ one, many }) => ({
   notes: many(notes),
   events: many(events),
   tasks: many(familyTasks),
+  familyDates: many(familyDates),
   conversations: many(aiConversations),
+}));
+
+export const familyDatesRelations = relations(familyDates, ({ one }) => ({
+  family: one(families, { fields: [familyDates.familyId], references: [families.id] }),
+  creator: one(users, { fields: [familyDates.createdBy], references: [users.id] }),
 }));
 
 export const familyTasksRelations = relations(familyTasks, ({ one, many }) => ({

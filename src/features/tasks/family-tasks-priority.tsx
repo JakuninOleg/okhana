@@ -111,11 +111,10 @@ export function FamilyTasksPriority({
     <section className="shrink-0 rounded-2xl border border-brand-peach/40 bg-brand-sun/30 p-3 shadow-sm sm:p-4 dark:bg-brand-sun/10">
       <div className="mb-3 flex items-start justify-between gap-3">
         <div className="min-w-0 space-y-1">
-          <p className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.16em] text-brand-peach">
-            <ListTodo className="size-3.5" aria-hidden />
-            {t('priorityEyebrow')}
-          </p>
-          <h2 className="text-base font-semibold tracking-tight sm:text-lg">{t('priorityTitle')}</h2>
+          <h2 className="flex items-center gap-2 text-base font-semibold tracking-tight sm:text-lg">
+            <ListTodo className="size-4 shrink-0 text-brand-peach" aria-hidden />
+            {t('priorityTitle')}
+          </h2>
           <p className="text-sm text-muted-foreground">{t('prioritySubtitle')}</p>
         </div>
         <FamilyTasksSheet />

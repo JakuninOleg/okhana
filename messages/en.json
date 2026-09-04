@@ -80,6 +80,42 @@
         "db_unavailable": "Database is busy. Please try again."
       }
     },
+    "familyDates": {
+      "open": "Family dates",
+      "title": "Memorable dates",
+      "description": "Shared anniversaries and family dates. They will appear on the calendar later.",
+      "add": "Add date",
+      "cancelAdd": "Cancel",
+      "empty": "No shared dates yet. Add a wedding anniversary, a family holiday, or another day worth remembering.",
+      "loading": "Loading dates…",
+      "titleLabel": "Title",
+      "titlePlaceholder": "e.g. Our wedding",
+      "kindLabel": "Type",
+      "dayLabel": "Day",
+      "monthLabel": "Month",
+      "yearLabel": "Year",
+      "yearOptional": "Optional",
+      "notesLabel": "Note",
+      "notesPlaceholder": "Optional reminder note",
+      "save": "Save date",
+      "saving": "Saving…",
+      "delete": "Delete date",
+      "sinceYear": "since {year}",
+      "nextOn": "next {date}",
+      "kind": {
+        "anniversary": "Anniversary",
+        "birthday": "Birthday",
+        "holiday": "Family holiday",
+        "other": "Other"
+      },
+      "errors": {
+        "unauthorized": "Please sign in again.",
+        "forbidden": "Only adults can manage family dates.",
+        "invalid_input": "Check the date and try again.",
+        "not_found": "Date not found.",
+        "db_unavailable": "Database is busy. Please try again."
+      }
+    },
     "onboarding": {
       "eyebrow": "Almost there",
       "title": "Set up your family space",
@@ -154,7 +190,6 @@
       "progress": "{done}/{total} done",
       "markSeen": "Mark seen",
       "markDone": "Mark done",
-      "priorityEyebrow": "Priority",
       "priorityTitle": "Your tasks",
       "prioritySubtitle": "Assigned to you or created by you — updated live.",
       "priorityEmpty": "No active tasks. Create one in chat.",
