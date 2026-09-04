@@ -31,6 +31,8 @@ export function FamilyTasksPriority({
   const locale = useLocale();
   const [tasks, setTasks] = useState(initialTasks);
   const [pushHint, setPushHint] = useState<'idle' | 'need' | 'on' | 'unsupported'>('idle');
+  // Snapshot once — Date.now() during render trips react-hooks/purity.
+  const [nowMs] = useState(() => Date.now());
   const knownIdsRef = useRef(new Set(initialTasks.map((task) => task.id)));
 
   useEffect(() => {
@@ -136,7 +138,7 @@ export function FamilyTasksPriority({
           {tasks.slice(0, 5).map((task) => {
             const due = formatDue(task.dueAt, locale);
             const isUrgent = Boolean(
-              task.dueAt && new Date(task.dueAt).getTime() - Date.now() < 24 * 60 * 60 * 1000,
+              task.dueAt && new Date(task.dueAt).getTime() - nowMs < 24 * 60 * 60 * 1000,
             );
             return (
               <li
