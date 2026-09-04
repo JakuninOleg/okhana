@@ -10,6 +10,7 @@ import {
   type FamilyRole,
 } from '@/features/family/family-member-types';
 import { FamilyMemberAvatar } from '@/features/family/family-member-avatar';
+import { FamilyDatesSheet } from '@/features/family/family-dates-sheet';
 import { InviteCodeDisplay } from '@/features/family/invite-code-display';
 import { MemberProfileSheet } from '@/features/family/member-profile-sheet';
 import { FamilyTasksSheet } from '@/features/tasks/family-tasks-sheet';
@@ -175,7 +176,7 @@ export function FamilyHubMenu({
 
   return (
     <div className="flex flex-1 flex-col gap-3 lg:min-h-0 lg:flex-row lg:gap-4">
-      <aside className="hidden w-72 shrink-0 flex-col gap-4 rounded-2xl border border-border/60 bg-card/80 p-4 shadow-sm backdrop-blur-sm lg:flex lg:min-h-0 xl:w-80">
+      <aside className="hidden w-72 shrink-0 flex-col gap-4 rounded-2xl border border-border/60 bg-card/80 p-4 shadow-sm backdrop-blur-sm lg:flex xl:w-80">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 space-y-1">
             <p className="truncate text-xl font-semibold tracking-tight">{familyName}</p>
@@ -184,12 +185,14 @@ export function FamilyHubMenu({
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-1">
+            <FamilyDatesSheet />
             <FamilyTasksSheet />
             <FamilySettingsSheet familyName={familyName} inviteCode={inviteCode} />
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto">
+        {/* Fixed rail — small member count; do not nest a scrollport here. */}
+        <div className="shrink-0 space-y-2">
           <p className="px-1 text-xs font-medium uppercase tracking-[0.16em] text-brand-peach">
             {t('membersTitle')}
           </p>
@@ -217,6 +220,7 @@ export function FamilyHubMenu({
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-1">
+              <FamilyDatesSheet />
               <FamilyTasksSheet />
               <FamilySettingsSheet familyName={familyName} inviteCode={inviteCode} />
             </div>
