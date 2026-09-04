@@ -190,7 +190,6 @@
       "progress": "{done}/{total} done",
       "markSeen": "Mark seen",
       "markDone": "Mark done",
-      "priorityEyebrow": "Priority",
       "priorityTitle": "Your tasks",
       "prioritySubtitle": "Assigned to you or created by you — updated live.",
       "priorityEmpty": "No active tasks. Create one in chat.",
