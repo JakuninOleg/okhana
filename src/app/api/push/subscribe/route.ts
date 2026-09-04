@@ -2,7 +2,11 @@ import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
-import { getVapidPublicKey, upsertPushSubscription } from '@/features/notifications/web-push';
+import {
+  getVapidPublicKey,
+  isAllowedPushEndpoint,
+  upsertPushSubscription,
+} from '@/features/notifications/web-push';
 import { db } from '@/lib/server/db';
 import { withDbRetry } from '@/lib/server/db/client';
 import { users } from '@/lib/server/db/schema';
@@ -10,7 +14,9 @@ import { users } from '@/lib/server/db/schema';
 export const runtime = 'nodejs';
 
 const subscribeSchema = z.object({
-  endpoint: z.string().url().max(2048),
+  endpoint: z.string().url().max(2048).refine(isAllowedPushEndpoint, {
+    message: 'Push endpoint host is not allowed',
+  }),
   keys: z.object({
     p256dh: z.string().min(1).max(255),
     auth: z.string().min(1).max(255),

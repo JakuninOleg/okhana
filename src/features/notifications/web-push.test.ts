@@ -92,7 +92,7 @@ describe('web-push helpers', () => {
       {
         id: 9,
         userId: 2,
-        endpoint: 'https://push.example/sub',
+        endpoint: 'https://fcm.googleapis.com/fcm/send/abc',
         p256dh: 'p',
         auth: 'a',
       },
@@ -100,12 +100,12 @@ describe('web-push helpers', () => {
     mockSendNotification.mockResolvedValue(undefined);
     const { sendPushToUsers } = await import('./web-push');
 
-    await sendPushToUsers([2], { title: 'Okhana', body: 'Buy milk', url: '/dashboard' });
+    await sendPushToUsers([2], { title: 'Okhana', body: 'Buy milk', url: '/ru/dashboard' });
 
     expect(mockSetVapidDetails).toHaveBeenCalled();
     expect(mockSendNotification).toHaveBeenCalledWith(
       {
-        endpoint: 'https://push.example/sub',
+        endpoint: 'https://fcm.googleapis.com/fcm/send/abc',
         keys: { p256dh: 'p', auth: 'a' },
       },
       expect.stringContaining('Buy milk'),
@@ -117,7 +117,7 @@ describe('web-push helpers', () => {
       {
         id: 9,
         userId: 2,
-        endpoint: 'https://push.example/gone',
+        endpoint: 'https://fcm.googleapis.com/fcm/send/gone',
         p256dh: 'p',
         auth: 'a',
       },
@@ -128,5 +128,14 @@ describe('web-push helpers', () => {
 
     await sendPushToUsers([2], { title: 'Okhana', body: 'x' });
     expect(mockDeleteWhere).toHaveBeenCalled();
+  });
+
+  it('isAllowedPushEndpoint rejects SSRF targets', async () => {
+    const { isAllowedPushEndpoint } = await import('./web-push');
+    expect(isAllowedPushEndpoint('https://fcm.googleapis.com/fcm/send/x')).toBe(true);
+    expect(isAllowedPushEndpoint('https://updates.push.services.mozilla.com/wpush/v2/x')).toBe(true);
+    expect(isAllowedPushEndpoint('https://169.254.169.254/latest/meta-data/')).toBe(false);
+    expect(isAllowedPushEndpoint('http://fcm.googleapis.com/fcm/send/x')).toBe(false);
+    expect(isAllowedPushEndpoint('https://evil.example/push')).toBe(false);
   });
 });

@@ -1,8 +1,17 @@
 import { and, eq } from 'drizzle-orm';
 import { sendPushToUsers } from '@/features/notifications/web-push';
+import { routing } from '@/i18n/routing';
 import { db } from '@/lib/server/db';
 import { withDbRetry } from '@/lib/server/db/client';
 import { familyTasks } from '@/lib/server/db/schema';
+
+/** Locale-prefixed dashboard path for notification deep links (app has no bare /dashboard). */
+export function taskNotificationUrl(localePath?: string): string {
+  if (localePath?.startsWith('/')) {
+    return localePath;
+  }
+  return `/${routing.defaultLocale}/dashboard`;
+}
 
 /**
  * Push to assignees when a task is created (excludes the creator).
@@ -25,7 +34,7 @@ export async function notifyTaskAssigned(input: {
     body: input.dueAt
       ? `${input.title} · ${new Date(input.dueAt).toISOString()}`
       : input.title,
-    url: input.localePath ?? '/dashboard',
+    url: taskNotificationUrl(input.localePath),
     tag: `task-assigned-${input.title.slice(0, 32)}`,
   });
 }
@@ -61,7 +70,7 @@ export async function notifyTaskCompleted(input: {
   await sendPushToUsers([task.createdBy], {
     title: 'Okhana',
     body: `✓ ${task.title}`,
-    url: input.localePath ?? '/dashboard',
+    url: taskNotificationUrl(input.localePath),
     tag: `task-done-${input.taskId}`,
   });
 }

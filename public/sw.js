@@ -26,7 +26,8 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('push', (event) => {
   let title = 'Okhana';
   let body = '';
-  let url = '/dashboard';
+  // Default matches next-intl defaultLocale (ru) — bare /dashboard is not a route.
+  let url = '/ru/dashboard';
   let tag = 'okhana-task';
 
   try {
@@ -54,7 +55,11 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const targetUrl = event.notification.data?.url || '/dashboard';
+  const rawUrl = event.notification.data?.url || '/ru/dashboard';
+  // Same-origin paths only — ignore absolute URLs from a poisoned payload.
+  const targetUrl = typeof rawUrl === 'string' && rawUrl.startsWith('/') && !rawUrl.startsWith('//')
+    ? rawUrl
+    : '/ru/dashboard';
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
       for (const client of clients) {

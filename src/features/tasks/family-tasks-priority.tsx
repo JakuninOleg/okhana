@@ -50,36 +50,55 @@ export function FamilyTasksPriority({
   }, []);
 
   useEffect(() => {
-    const source = new EventSource('/api/tasks/events');
+    let disposed = false;
+    let source: EventSource | null = null;
 
-    source.addEventListener('tasks', (event) => {
-      try {
-        const payload = JSON.parse((event as MessageEvent).data) as { tasks?: VisibleTask[] };
-        const next = payload.tasks ?? [];
-        const previous = knownIdsRef.current;
-        const newcomers = next.filter((task) => !previous.has(task.id) && task.myAssignment);
+    const connect = (): void => {
+      if (disposed) return;
+      source = new EventSource('/api/tasks/events');
 
-        for (const task of newcomers) {
-          if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-            new Notification(t('pushTitle'), {
-              body: task.title,
-              tag: `task-${task.id}`,
-            });
+      source.addEventListener('tasks', (event) => {
+        try {
+          const payload = JSON.parse((event as MessageEvent).data) as { tasks?: VisibleTask[] };
+          const next = payload.tasks ?? [];
+          const previous = knownIdsRef.current;
+          const newcomers = next.filter((task) => !previous.has(task.id) && task.myAssignment);
+
+          // Page Notification only when tab is hidden — avoids duplicate with Web Push
+          // while the dashboard is focused.
+          for (const task of newcomers) {
+            if (
+              typeof Notification !== 'undefined'
+              && Notification.permission === 'granted'
+              && document.visibilityState === 'hidden'
+            ) {
+              new Notification(t('pushTitle'), {
+                body: task.title,
+                tag: `task-${task.id}`,
+              });
+            }
           }
+
+          knownIdsRef.current = new Set(next.map((task) => task.id));
+          setTasks(next);
+        } catch {
+          // ignore malformed SSE payloads
         }
+      });
 
-        knownIdsRef.current = new Set(next.map((task) => task.id));
-        setTasks(next);
-      } catch {
-        // ignore malformed SSE payloads
-      }
-    });
+      // Server closes after ~55s; reopen so live updates keep flowing.
+      source.addEventListener('reconnect', () => {
+        source?.close();
+        source = null;
+        connect();
+      });
+    };
 
-    source.addEventListener('reconnect', () => {
-      source.close();
-    });
-
-    return () => source.close();
+    connect();
+    return () => {
+      disposed = true;
+      source?.close();
+    };
   }, [t]);
 
   const dueSoon = tasks

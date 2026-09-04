@@ -127,7 +127,13 @@ export function FamilyChat(): React.JSX.Element {
     if (!list) {
       return;
     }
-    list.scrollTop = list.scrollHeight;
+    // Desktop: list is the overflow scroller. Mobile: page scrolls — use scrollIntoView.
+    if (typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches) {
+      list.scrollTop = list.scrollHeight;
+      return;
+    }
+    const last = list.lastElementChild;
+    last?.scrollIntoView({ block: 'end' });
   });
 
   useEffect(() => {

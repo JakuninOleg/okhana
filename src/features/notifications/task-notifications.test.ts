@@ -53,6 +53,7 @@ describe('task notifications', () => {
       expect.objectContaining({
         title: 'Okhana',
         body: 'Buy milk',
+        url: '/ru/dashboard',
         tag: expect.stringContaining('task-assigned'),
       }),
     );
@@ -85,6 +86,7 @@ describe('task notifications', () => {
       [1],
       expect.objectContaining({
         body: '✓ Buy milk',
+        url: '/ru/dashboard',
         tag: 'task-done-55',
       }),
     );

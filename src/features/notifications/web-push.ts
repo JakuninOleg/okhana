@@ -11,6 +11,40 @@ export type PushPayload = {
   tag?: string;
 };
 
+/** Known Web Push provider hosts — blocks SSRF via attacker-controlled endpoints. */
+const PUSH_ENDPOINT_HOST_PATTERNS: RegExp[] = [
+  /^fcm\.googleapis\.com$/i,
+  /^android\.googleapis\.com$/i,
+  /^updates\.push\.services\.mozilla\.com$/i,
+  /^[a-z0-9-]+\.push\.services\.mozilla\.com$/i,
+  /^web\.push\.apple\.com$/i,
+  /^[a-z0-9-]+\.push\.apple\.com$/i,
+  /^[a-z0-9.-]+\.notify\.windows\.com$/i,
+];
+
+/**
+ * Accept only https push provider URLs (no IP literals / private hosts).
+ */
+export function isAllowedPushEndpoint(endpoint: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(endpoint);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== 'https:') {
+    return false;
+  }
+  if (url.port && url.port !== '443') {
+    return false;
+  }
+  // Reject IPv4 / IPv6 literals (SSRF to metadata / internal nets).
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(url.hostname) || url.hostname.includes(':')) {
+    return false;
+  }
+  return PUSH_ENDPOINT_HOST_PATTERNS.some((pattern) => pattern.test(url.hostname));
+}
+
 function getVapidConfig(): { publicKey: string; privateKey: string; subject: string } | null {
   // Server-only: browser gets the public key via GET /api/push/subscribe (not NEXT_PUBLIC_*).
   const publicKey = process.env.VAPID_PUBLIC_KEY?.trim();
@@ -33,6 +67,10 @@ export async function upsertPushSubscription(input: {
   auth: string;
   userAgent?: string | null;
 }): Promise<void> {
+  if (!isAllowedPushEndpoint(input.endpoint)) {
+    throw new Error('Invalid push endpoint');
+  }
+
   await withDbRetry(async () => {
     const existing = await db
       .select({ id: pushSubscriptions.id })
@@ -87,6 +125,12 @@ export async function sendPushToUsers(
   const body = JSON.stringify(payload);
   await Promise.all(
     rows.map(async (row) => {
+      if (!isAllowedPushEndpoint(row.endpoint)) {
+        await withDbRetry(async () => {
+          await db.delete(pushSubscriptions).where(eq(pushSubscriptions.id, row.id));
+        });
+        return;
+      }
       try {
         await webpush.sendNotification(
           {
