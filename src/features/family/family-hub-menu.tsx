@@ -13,7 +13,6 @@ import { FamilyMemberAvatar } from '@/features/family/family-member-avatar';
 import { FamilyDatesSheet } from '@/features/family/family-dates-sheet';
 import { InviteCodeDisplay } from '@/features/family/invite-code-display';
 import { MemberProfileSheet } from '@/features/family/member-profile-sheet';
-import { FamilyTasksSheet } from '@/features/tasks/family-tasks-sheet';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
@@ -186,7 +185,6 @@ export function FamilyHubMenu({
           </div>
           <div className="flex shrink-0 items-center gap-1">
             <FamilyDatesSheet />
-            <FamilyTasksSheet />
             <FamilySettingsSheet familyName={familyName} inviteCode={inviteCode} />
           </div>
         </div>
@@ -221,7 +219,6 @@ export function FamilyHubMenu({
             </div>
             <div className="flex shrink-0 items-center gap-1">
               <FamilyDatesSheet />
-              <FamilyTasksSheet />
               <FamilySettingsSheet familyName={familyName} inviteCode={inviteCode} />
             </div>
           </div>
