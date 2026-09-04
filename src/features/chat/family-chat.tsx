@@ -38,6 +38,7 @@ import {
 import { OkhanaAvatar } from '@/features/chat/okhana-avatar';
 import { playChatSpeech } from '@/features/chat/play-chat-speech';
 import { readOpenAiChatStream } from '@/features/chat/read-openai-stream';
+import { sanitizeChatRequestMessages } from '@/features/chat/sanitize-chat-request-messages';
 import {
   getServerTtsEnabledSnapshot,
   getTtsEnabledSnapshot,
@@ -265,6 +266,11 @@ export function FamilyChat(): React.JSX.Element {
     abortRef.current = controller;
 
     try {
+      const outboundMessages = sanitizeChatRequestMessages(nextMessages);
+      if (outboundMessages.length === 0) {
+        throw new Error(t('requestFailed'));
+      }
+
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -273,10 +279,7 @@ export function FamilyChat(): React.JSX.Element {
           locale,
           clientNow: formatClientNowIso(),
           timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-          messages: nextMessages.map((message) => ({
-            role: message.role,
-            content: message.content,
-          })),
+          messages: outboundMessages,
         }),
       });
 
@@ -288,7 +291,7 @@ export function FamilyChat(): React.JSX.Element {
         throw new Error(t('streamUnavailable'));
       }
 
-      await readOpenAiChatStream(
+      const streamedText = await readOpenAiChatStream(
         response.body,
         (delta) => {
           updateFamilyChatMessages((current) =>
@@ -302,10 +305,30 @@ export function FamilyChat(): React.JSX.Element {
         controller.signal,
       );
 
+      // Stop / abort: do not invent an emptyReply bubble.
+      if (controller.signal.aborted) {
+        setStatus('idle');
+        updateFamilyChatMessages((current) =>
+          current.filter((message) => message.id !== assistantId || message.content.length > 0),
+        );
+        return;
+      }
+
+      const assistantText = streamedText.trim().length > 0
+        ? streamedText
+        : t('emptyReply');
+
+      if (!streamedText.trim()) {
+        updateFamilyChatMessages((current) =>
+          current.map((message) =>
+            message.id === assistantId
+              ? { ...message, content: assistantText }
+              : message,
+          ),
+        );
+      }
+
       setStatus('idle');
-      const assistantText = getFamilyChatSnapshot().messages.find(
-        (message) => message.id === assistantId,
-      )?.content ?? '';
       void maybeSpeakAssistant(assistantText);
     } catch (error) {
       if (controller.signal.aborted) {

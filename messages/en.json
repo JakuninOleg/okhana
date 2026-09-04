@@ -134,7 +134,8 @@
       "stopResponse": "Stop response",
       "send": "Send",
       "requestFailed": "Could not reach Okhana. Try again.",
-      "streamUnavailable": "Streaming is not available in this browser."
+      "streamUnavailable": "Streaming is not available in this browser.",
+      "emptyReply": "Okhana did not return a reply. Please try again."
     },
     "tasks": {
       "open": "Family tasks",
