@@ -53,6 +53,7 @@ vi.mock('@/features/ai/go-ai-client', () => ({
 }));
 
 vi.mock('@/features/ai/chat-with-tools', () => ({
+  EMPTY_ASSISTANT_FALLBACK: 'I could not generate a reply just now. Please try again.',
   createChatWithToolsStream: (options: unknown) => mockCreateChatWithToolsStream(options),
 }));
 
@@ -170,6 +171,32 @@ describe('POST /api/chat', () => {
       body: JSON.stringify({ messages: [] }),
     }));
     expect(res.status).toBe(400);
+  });
+
+  it('accepts histories that include a blank assistant placeholder', async () => {
+    mockAuth.mockResolvedValue({ userId: 'clerk_1' });
+    const { POST } = await loadRoute();
+    const res = await POST(new Request('http://localhost/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        locale: 'ru',
+        messages: [
+          { role: 'user', content: 'Какие у меня поручения?' },
+          { role: 'assistant', content: '' },
+          { role: 'user', content: 'Какие у меня поручения?' },
+        ],
+      }),
+    }));
+    expect(res.status).toBe(200);
+    expect(mockCreateChatWithToolsStream).toHaveBeenCalled();
+    const arg = mockCreateChatWithToolsStream.mock.calls[0]?.[0] as {
+      messages: Array<{ role: string; content: string }>;
+    };
+    expect(arg.messages.filter((message) => message.role !== 'system')).toEqual([
+      { role: 'user', content: 'Какие у меня поручения?' },
+      { role: 'user', content: 'Какие у меня поручения?' },
+    ]);
   });
 
   it('rejects client-supplied system roles', async () => {

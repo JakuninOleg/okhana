@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { MAX_TOOL_ITERATIONS, createChatWithToolsStream } from '@/features/ai/chat-with-tools';
+import { MAX_TOOL_ITERATIONS, EMPTY_ASSISTANT_FALLBACK, createChatWithToolsStream } from '@/features/ai/chat-with-tools';
 
 const mockExecuteAiTool = vi.hoisted(() => vi.fn());
 
@@ -185,5 +185,50 @@ describe('createChatWithToolsStream', () => {
 
     const lastBody = JSON.parse(String((fetchImpl.mock.calls[2] as [string, RequestInit])[1].body));
     expect(lastBody.tools).toBeUndefined();
+  });
+
+  it('streams a fallback when the model returns no text and no tools', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const fetchImpl = vi.fn(async () =>
+      sseResponse([
+        'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\n',
+        'data: [DONE]\n\n',
+      ]),
+    );
+    const onComplete = vi.fn();
+
+    const response = createChatWithToolsStream({
+      messages: [{ role: 'user', content: 'Какие у меня поручения?' }],
+      toolContext: { familyId: 1, userId: 2, familyRole: 'owner' },
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      onComplete,
+    });
+
+    await expect(readStreamText(response)).resolves.toBe(EMPTY_ASSISTANT_FALLBACK);
+    expect(onComplete).toHaveBeenCalledWith({ text: EMPTY_ASSISTANT_FALLBACK });
+    expect(errorSpy).toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
+
+  it('streams a locale-aware fallback override when provided', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const fetchImpl = vi.fn(async () =>
+      sseResponse([
+        'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\n',
+        'data: [DONE]\n\n',
+      ]),
+    );
+
+    const response = createChatWithToolsStream({
+      messages: [{ role: 'user', content: 'Какие у меня поручения?' }],
+      emptyAssistantFallback: 'Охана не вернула ответ. Попробуйте ещё раз.',
+      toolContext: { familyId: 1, userId: 2, familyRole: 'owner' },
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+    });
+
+    await expect(readStreamText(response)).resolves.toBe(
+      'Охана не вернула ответ. Попробуйте ещё раз.',
+    );
+    errorSpy.mockRestore();
   });
 });

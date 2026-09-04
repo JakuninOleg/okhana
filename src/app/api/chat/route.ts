@@ -1,7 +1,8 @@
 import { auth } from '@clerk/nextjs/server';
 import { and, desc, eq } from 'drizzle-orm';
 import { z } from 'zod';
-import { createChatWithToolsStream } from '@/features/ai/chat-with-tools';
+import { coerceChatRequestBody } from '@/app/api/chat/coerce-chat-request-body';
+import { createChatWithToolsStream, EMPTY_ASSISTANT_FALLBACK } from '@/features/ai/chat-with-tools';
 import { getGoAiConfig } from '@/features/ai/go-ai-client';
 import type { GoAiMessage } from '@/features/ai/go-ai-types';
 import { buildSystemPrompt } from '@/features/ai/system-prompt';
@@ -208,7 +209,7 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ error: 'Invalid chat payload' }, { status: 400 });
   }
 
-  const parsedBody = chatRequestSchema.safeParse(rawBody);
+  const parsedBody = chatRequestSchema.safeParse(coerceChatRequestBody(rawBody));
   if (!parsedBody.success) {
     return Response.json({ error: 'Invalid chat payload' }, { status: 400 });
   }
@@ -243,6 +244,9 @@ export async function POST(request: Request): Promise<Response> {
 
   return createChatWithToolsStream({
     messages: modelMessages,
+    emptyAssistantFallback: locale === 'ru'
+      ? 'Охана не вернула ответ. Попробуйте ещё раз.'
+      : EMPTY_ASSISTANT_FALLBACK,
     toolContext: context
       ? {
         familyId: context.familyId,

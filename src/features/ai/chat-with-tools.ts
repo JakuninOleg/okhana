@@ -12,10 +12,16 @@ import type { GoAiMessage } from '@/features/ai/go-ai-types';
 /** Hard cap on model→tool→model rounds. Iterative loop (no recursion) avoids stack overflows. */
 export const MAX_TOOL_ITERATIONS = 3;
 
+/** Streamed when the model finishes without any visible text (avoids empty assistant bubbles). */
+export const EMPTY_ASSISTANT_FALLBACK =
+  'I could not generate a reply just now. Please try again.';
+
 export type ChatWithToolsInput = {
   messages: GoAiMessage[];
   /** When omitted, the model runs without tools (ephemeral / DB-down mode). */
   toolContext?: BuildAiToolsInput;
+  /** Locale-aware copy when the model returns no visible text. */
+  emptyAssistantFallback?: string;
   signal?: AbortSignal;
   onComplete?: (result: { text: string }) => Promise<void> | void;
   fetchImpl?: typeof fetch;
@@ -30,6 +36,15 @@ export function createChatWithToolsStream(input: ChatWithToolsInput): Response {
     async start(controller) {
       let workingMessages = [...input.messages];
       let finalText = '';
+      let streamedText = '';
+
+      const enqueueContent = (delta: string): void => {
+        if (!delta) {
+          return;
+        }
+        streamedText += delta;
+        controller.enqueue(encodeOpenAiContentDelta(delta));
+      };
 
       try {
         for (let step = 0; step < MAX_TOOL_ITERATIONS; step += 1) {
@@ -56,21 +71,21 @@ export function createChatWithToolsStream(input: ChatWithToolsInput): Response {
               step,
               messages: workingMessages,
             }));
-            controller.enqueue(encodeOpenAiContentDelta(safeError.message));
+            enqueueContent(safeError.message);
             finalText = safeError.message;
             break;
           }
 
           if (!upstream.body) {
             const fallback = 'The model gateway returned an empty response.';
-            controller.enqueue(encodeOpenAiContentDelta(fallback));
+            enqueueContent(fallback);
             finalText = fallback;
             break;
           }
 
           const assembled = await assembleOpenAiSseStream(upstream.body, {
             onContentDelta: (delta) => {
-              controller.enqueue(encodeOpenAiContentDelta(delta));
+              enqueueContent(delta);
             },
           });
 
@@ -124,6 +139,18 @@ export function createChatWithToolsStream(input: ChatWithToolsInput): Response {
             ];
           }
         }
+
+        // Model finished with tool rounds or a bare stop but no visible text.
+        if (!input.signal?.aborted && !finalText.trim()) {
+          if (streamedText.trim()) {
+            finalText = streamedText.trim();
+          } else {
+            const fallback = input.emptyAssistantFallback?.trim() || EMPTY_ASSISTANT_FALLBACK;
+            console.error('chat-with-tools empty assistant reply');
+            enqueueContent(fallback);
+            finalText = fallback;
+          }
+        }
       } catch (error) {
         if (input.signal?.aborted) {
           return;
@@ -134,7 +161,7 @@ export function createChatWithToolsStream(input: ChatWithToolsInput): Response {
         });
         const message = 'Something went wrong while contacting the assistant.';
         if (!input.signal?.aborted) {
-          controller.enqueue(encodeOpenAiContentDelta(message));
+          enqueueContent(message);
         }
         finalText = message;
       } finally {
