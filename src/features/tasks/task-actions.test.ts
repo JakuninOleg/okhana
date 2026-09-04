@@ -116,4 +116,19 @@ describe('task-actions', () => {
       error: 'complete_blocked',
     });
   });
+
+  it('maps missing tasks to not_found', async () => {
+    mockAuth.mockResolvedValue({ userId: 'clerk_1' });
+    mockSelectLimit.mockResolvedValue([{ id: 2, familyId: 7 }]);
+    mockComplete.mockResolvedValue({
+      ok: false,
+      error: 'Task not found',
+    });
+    const { completeTaskAction } = await load();
+
+    await expect(completeTaskAction(9)).resolves.toEqual({
+      ok: false,
+      error: 'not_found',
+    });
+  });
 });
