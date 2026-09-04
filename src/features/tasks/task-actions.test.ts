@@ -57,7 +57,7 @@ describe('task-actions', () => {
     const { loadMyTasksAction } = await load();
     await expect(loadMyTasksAction('active')).resolves.toEqual({
       ok: false,
-      error: 'Unauthorized',
+      error: 'unauthorized',
     });
   });
 
@@ -67,7 +67,7 @@ describe('task-actions', () => {
     const { loadMyTasksAction } = await load();
     await expect(loadMyTasksAction()).resolves.toEqual({
       ok: false,
-      error: 'Unauthorized',
+      error: 'unauthorized',
     });
   });
 
@@ -102,7 +102,22 @@ describe('task-actions', () => {
     });
   });
 
-  it('completeTaskAction surfaces assignment errors', async () => {
+  it('maps assignment cancelled to complete_blocked', async () => {
+    mockAuth.mockResolvedValue({ userId: 'clerk_1' });
+    mockSelectLimit.mockResolvedValue([{ id: 2, familyId: 7 }]);
+    mockComplete.mockResolvedValue({
+      ok: false,
+      error: 'Assignment is cancelled',
+    });
+    const { completeTaskAction } = await load();
+
+    await expect(completeTaskAction(9)).resolves.toEqual({
+      ok: false,
+      error: 'complete_blocked',
+    });
+  });
+
+  it('maps missing tasks to not_found', async () => {
     mockAuth.mockResolvedValue({ userId: 'clerk_1' });
     mockSelectLimit.mockResolvedValue([{ id: 2, familyId: 7 }]);
     mockComplete.mockResolvedValue({
@@ -113,7 +128,7 @@ describe('task-actions', () => {
 
     await expect(completeTaskAction(9)).resolves.toEqual({
       ok: false,
-      error: 'Task not found',
+      error: 'not_found',
     });
   });
 });

@@ -11,6 +11,14 @@ import { db } from '@/lib/server/db';
 import { withDbRetry } from '@/lib/server/db/client';
 import { users } from '@/lib/server/db/schema';
 
+export type TaskActionErrorCode =
+  | 'unauthorized'
+  | 'not_found'
+  | 'cancelled'
+  | 'ack_blocked'
+  | 'complete_blocked'
+  | 'generic';
+
 async function requireFamilyUser(): Promise<{ familyId: number; userId: number } | null> {
   const { userId: clerkUserId } = await auth();
   if (!clerkUserId) {
@@ -31,12 +39,20 @@ async function requireFamilyUser(): Promise<{ familyId: number; userId: number }
   });
 }
 
+function mapAssignmentError(message: string): TaskActionErrorCode {
+  if (message === 'Task not found') return 'not_found';
+  if (message === 'Task is cancelled') return 'cancelled';
+  if (message === 'Assignment is cancelled') return 'complete_blocked';
+  if (message.startsWith('Cannot acknowledge')) return 'ack_blocked';
+  return 'generic';
+}
+
 export async function loadMyTasksAction(
   scope: 'active' | 'completed' = 'active',
-): Promise<{ ok: true; tasks: VisibleTask[] } | { ok: false; error: string }> {
+): Promise<{ ok: true; tasks: VisibleTask[] } | { ok: false; error: TaskActionErrorCode }> {
   const ctx = await requireFamilyUser();
   if (!ctx) {
-    return { ok: false, error: 'Unauthorized' };
+    return { ok: false, error: 'unauthorized' };
   }
 
   const tasks = await listVisibleTasks({
@@ -49,10 +65,10 @@ export async function loadMyTasksAction(
 
 export async function acknowledgeTaskAction(
   taskId: number,
-): Promise<{ ok: true; status: 'seen' } | { ok: false; error: string }> {
+): Promise<{ ok: true; status: 'seen' } | { ok: false; error: TaskActionErrorCode }> {
   const ctx = await requireFamilyUser();
   if (!ctx) {
-    return { ok: false, error: 'Unauthorized' };
+    return { ok: false, error: 'unauthorized' };
   }
 
   const result = await acknowledgeTaskAssignment({
@@ -61,17 +77,17 @@ export async function acknowledgeTaskAction(
     taskId,
   });
   if (!result.ok) {
-    return { ok: false, error: result.error };
+    return { ok: false, error: mapAssignmentError(result.error) };
   }
   return { ok: true, status: 'seen' };
 }
 
 export async function completeTaskAction(
   taskId: number,
-): Promise<{ ok: true; status: 'done' } | { ok: false; error: string }> {
+): Promise<{ ok: true; status: 'done' } | { ok: false; error: TaskActionErrorCode }> {
   const ctx = await requireFamilyUser();
   if (!ctx) {
-    return { ok: false, error: 'Unauthorized' };
+    return { ok: false, error: 'unauthorized' };
   }
 
   const result = await completeTaskAssignment({
@@ -80,7 +96,7 @@ export async function completeTaskAction(
     taskId,
   });
   if (!result.ok) {
-    return { ok: false, error: result.error };
+    return { ok: false, error: mapAssignmentError(result.error) };
   }
   return { ok: true, status: 'done' };
 }

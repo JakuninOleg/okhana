@@ -17,6 +17,7 @@ import {
   acknowledgeTaskAction,
   completeTaskAction,
   loadMyTasksAction,
+  type TaskActionErrorCode,
 } from '@/features/tasks/task-actions';
 import type { VisibleTask } from '@/features/tasks/list-tasks';
 import { cn } from '@/lib/utils';
@@ -100,7 +101,7 @@ export function FamilyTasksSheet(): React.JSX.Element {
   const [open, setOpen] = useState(false);
   const [scope, setScope] = useState<'active' | 'completed'>('active');
   const [tasks, setTasks] = useState<VisibleTask[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<TaskActionErrorCode | null>(null);
   const [loading, setLoading] = useState(false);
   const [pending, startTransition] = useTransition();
 
@@ -173,29 +174,31 @@ export function FamilyTasksSheet(): React.JSX.Element {
           <SheetDescription>{t('description')}</SheetDescription>
         </SheetHeader>
 
-        <div className="flex flex-wrap items-center gap-2 px-4 pt-4">
+        <div className="space-y-3 px-4 pt-4">
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant={scope === 'active' ? 'default' : 'outline'}
+              className={cn(scope === 'active' && 'pointer-events-none')}
+              onClick={() => switchScope('active')}
+            >
+              {t('tabActive')}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={scope === 'completed' ? 'default' : 'outline'}
+              className={cn(scope === 'completed' && 'pointer-events-none')}
+              onClick={() => switchScope('completed')}
+            >
+              {t('tabCompleted')}
+            </Button>
+          </div>
           <Button
             type="button"
             size="sm"
-            variant={scope === 'active' ? 'default' : 'outline'}
-            className={cn(scope === 'active' && 'pointer-events-none')}
-            onClick={() => switchScope('active')}
-          >
-            {t('tabActive')}
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant={scope === 'completed' ? 'default' : 'outline'}
-            className={cn(scope === 'completed' && 'pointer-events-none')}
-            onClick={() => switchScope('completed')}
-          >
-            {t('tabCompleted')}
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            className="ml-auto gap-1.5"
+            className="w-full gap-1.5"
             onClick={() => {
               setOpen(false);
               requestFamilyChatSend(t('createViaChat'));
@@ -213,7 +216,9 @@ export function FamilyTasksSheet(): React.JSX.Element {
               {t('loading')}
             </div>
           ) : error ? (
-            <p className="text-sm text-destructive" role="alert">{error}</p>
+            <p className="text-sm text-destructive" role="alert">
+              {t(`errors.${error}`)}
+            </p>
           ) : tasks.length === 0 ? (
             <div className="space-y-3 py-8 text-center">
               <p className="text-sm text-muted-foreground">{t('empty')}</p>
