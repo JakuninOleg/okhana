@@ -80,3 +80,52 @@ export function updateFamilyChatInput(input: string): void {
     input,
   });
 }
+
+const SEND_EVENT = 'okhana-family-chat-send';
+let pendingSendText: string | null = null;
+
+/** Ask the open FamilyChat to submit text (used by task sheet / quick actions). */
+export function requestFamilyChatSend(text: string): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  const trimmed = text.trim();
+  if (!trimmed) {
+    return;
+  }
+  pendingSendText = trimmed;
+  window.dispatchEvent(new Event(SEND_EVENT));
+}
+
+/**
+ * Subscriber should return true when the text was accepted for send.
+ * Returning false keeps the text queued (e.g. chat still streaming / not ready).
+ */
+export function subscribeFamilyChatSend(
+  onSend: (text: string) => boolean,
+): () => void {
+  if (typeof window === 'undefined') {
+    return () => undefined;
+  }
+  const flush = (): void => {
+    const text = pendingSendText;
+    if (!text) {
+      return;
+    }
+    if (onSend(text)) {
+      pendingSendText = null;
+    }
+  };
+  window.addEventListener(SEND_EVENT, flush);
+  // Drain anything queued before FamilyChat mounted (dynamic import).
+  flush();
+  return () => window.removeEventListener(SEND_EVENT, flush);
+}
+
+/** Re-attempt a queued send after the chat becomes idle. */
+export function flushFamilyChatSend(): void {
+  if (typeof window === 'undefined' || !pendingSendText) {
+    return;
+  }
+  window.dispatchEvent(new Event(SEND_EVENT));
+}

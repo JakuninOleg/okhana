@@ -30,6 +30,9 @@ const chatMessageSchema = z.object({
 const chatRequestSchema = z.object({
   messages: z.array(chatMessageSchema).min(1).max(MAX_REQUEST_MESSAGES),
   locale: z.enum(routing.locales).catch(routing.defaultLocale),
+  /** Device-local ISO-8601 datetime (with offset) for relative deadlines in chat. */
+  clientNow: z.string().datetime({ offset: true }).optional(),
+  timeZone: z.string().min(1).max(100).optional(),
 });
 
 function truncateText(text: string, maxLength: number): string {
@@ -216,7 +219,7 @@ export async function POST(request: Request): Promise<Response> {
     void loadChatContextFromDb(clerkUserId).catch(() => undefined);
   }
 
-  const { locale, messages: requestMessages } = parsedBody.data;
+  const { locale, messages: requestMessages, clientNow, timeZone } = parsedBody.data;
   const lastUserMessage = [...requestMessages].reverse().find((message) => message.role === 'user');
   const lastUserText = lastUserMessage?.content.trim() ?? '';
 
@@ -228,6 +231,8 @@ export async function POST(request: Request): Promise<Response> {
         familyRole: context?.familyRole ?? 'adult',
         familyMembers: context?.familyMembers ?? [],
         isNewConversation: context?.isNewConversation ?? !context,
+        clientNow: clientNow ?? null,
+        timeZone: timeZone ?? null,
       }),
     },
     ...requestMessages.slice(-MAX_MODEL_CONTEXT_MESSAGES).map((message) => ({

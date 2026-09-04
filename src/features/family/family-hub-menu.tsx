@@ -12,6 +12,7 @@ import {
 import { FamilyMemberAvatar } from '@/features/family/family-member-avatar';
 import { InviteCodeDisplay } from '@/features/family/invite-code-display';
 import { MemberProfileSheet } from '@/features/family/member-profile-sheet';
+import { FamilyTasksSheet } from '@/features/tasks/family-tasks-sheet';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
@@ -182,7 +183,10 @@ export function FamilyHubMenu({
               {t('membersCount', { count: members.length })}
             </p>
           </div>
-          <FamilySettingsSheet familyName={familyName} inviteCode={inviteCode} />
+          <div className="flex shrink-0 items-center gap-1">
+            <FamilyTasksSheet />
+            <FamilySettingsSheet familyName={familyName} inviteCode={inviteCode} />
+          </div>
         </div>
 
         <div className="min-h-0 flex-1 space-y-2 overflow-y-auto">
@@ -212,7 +216,10 @@ export function FamilyHubMenu({
                 {t('membersCount', { count: members.length })}
               </p>
             </div>
-            <FamilySettingsSheet familyName={familyName} inviteCode={inviteCode} />
+            <div className="flex shrink-0 items-center gap-1">
+              <FamilyTasksSheet />
+              <FamilySettingsSheet familyName={familyName} inviteCode={inviteCode} />
+            </div>
           </div>
           <ul className="-mx-0.5 flex gap-2 overflow-x-auto px-0.5 pb-1 snap-x snap-mandatory">
             {members.map((member) => (

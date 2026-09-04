@@ -1,6 +1,6 @@
 import {
   pgTable, serial, varchar, integer, timestamp, date,
-  boolean, text, jsonb, pgEnum, index, type AnyPgColumn
+  boolean, text, jsonb, pgEnum, index, uniqueIndex, type AnyPgColumn
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
@@ -10,6 +10,13 @@ export const profileSexEnum = pgEnum('profile_sex', ['female', 'male', 'unspecif
 export const privacyLevelEnum = pgEnum('privacy_level', ['public', 'adults_only', 'personal']);
 export const noteCategoryEnum = pgEnum('note_category', ['general', 'document', 'medical', 'finance', 'reminder']);
 export const messageRoleEnum = pgEnum('message_role', ['user', 'assistant', 'system']);
+/** Per-assignee lifecycle for family tasks (поручения). */
+export const taskAssigneeStatusEnum = pgEnum('task_assignee_status', [
+  'pending',
+  'seen',
+  'done',
+  'cancelled',
+]);
 
 // 1. users
 export const users = pgTable('users', {
@@ -80,7 +87,36 @@ export const events = pgTable('events', {
   index('events_family_start_idx').on(table.familyId, table.startTime),
 ]);
 
-// 5. ai_conversations
+// 5. family_tasks (chat-created поручения — separate from notes)
+export const familyTasks = pgTable('family_tasks', {
+  id: serial('id').primaryKey(),
+  familyId: integer('family_id').notNull().references(() => families.id, { onDelete: 'cascade' }),
+  title: varchar('title', { length: 255 }).notNull(),
+  description: text('description'),
+  dueAt: timestamp('due_at', { withTimezone: true }),
+  createdBy: integer('created_by').references(() => users.id, { onDelete: 'set null' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
+}, (table) => [
+  index('family_tasks_family_due_idx').on(table.familyId, table.dueAt),
+  index('family_tasks_created_by_idx').on(table.createdBy),
+]);
+
+// 6. family_task_assignees (per-person ack + done)
+export const familyTaskAssignees = pgTable('family_task_assignees', {
+  id: serial('id').primaryKey(),
+  taskId: integer('task_id').notNull().references(() => familyTasks.id, { onDelete: 'cascade' }),
+  userId: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  status: taskAssigneeStatusEnum('status').default('pending').notNull(),
+  seenAt: timestamp('seen_at', { withTimezone: true }),
+  doneAt: timestamp('done_at', { withTimezone: true }),
+}, (table) => [
+  uniqueIndex('family_task_assignees_task_user_uidx').on(table.taskId, table.userId),
+  index('family_task_assignees_user_status_idx').on(table.userId, table.status),
+  index('family_task_assignees_task_idx').on(table.taskId),
+]);
+
+// 7. ai_conversations
 export const aiConversations = pgTable('ai_conversations', {
   id: serial('id').primaryKey(),
   familyId: integer('family_id').notNull().references(() => families.id, { onDelete: 'cascade' }),
@@ -94,7 +130,7 @@ export const aiConversations = pgTable('ai_conversations', {
   index('conversations_updated_idx').on(table.updatedAt),
 ]);
 
-// 6. ai_chat_messages
+// 8. ai_chat_messages
 export const aiChatMessages = pgTable('ai_chat_messages', {
   id: serial('id').primaryKey(),
   conversationId: integer('conversation_id').notNull().references(() => aiConversations.id, { onDelete: 'cascade' }),
@@ -112,6 +148,8 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   ownedFamily: one(families, { fields: [users.id], references: [families.ownerId] }),
   createdNotes: many(notes),
   createdEvents: many(events),
+  createdTasks: many(familyTasks),
+  taskAssignments: many(familyTaskAssignees),
   conversations: many(aiConversations),
 }));
 
@@ -120,7 +158,19 @@ export const familiesRelations = relations(families, ({ one, many }) => ({
   members: many(users),
   notes: many(notes),
   events: many(events),
+  tasks: many(familyTasks),
   conversations: many(aiConversations),
+}));
+
+export const familyTasksRelations = relations(familyTasks, ({ one, many }) => ({
+  family: one(families, { fields: [familyTasks.familyId], references: [families.id] }),
+  creator: one(users, { fields: [familyTasks.createdBy], references: [users.id] }),
+  assignees: many(familyTaskAssignees),
+}));
+
+export const familyTaskAssigneesRelations = relations(familyTaskAssignees, ({ one }) => ({
+  task: one(familyTasks, { fields: [familyTaskAssignees.taskId], references: [familyTasks.id] }),
+  user: one(users, { fields: [familyTaskAssignees.userId], references: [users.id] }),
 }));
 
 export const notesRelations = relations(notes, ({ one }) => ({

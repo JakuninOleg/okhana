@@ -26,10 +26,12 @@ import { isConfidentlyEnglish } from '@/features/ai/english-guard';
 import { ChatMessage } from '@/features/chat/chat-message';
 import type { FamilyChatMessage } from '@/features/chat/family-chat-storage';
 import {
+  flushFamilyChatSend,
   getFamilyChatSnapshot,
   getServerFamilyChatSnapshot,
   replaceFamilyChatSnapshot,
   subscribeFamilyChat,
+  subscribeFamilyChatSend,
   updateFamilyChatInput,
   updateFamilyChatMessages,
 } from '@/features/chat/family-chat-store';
@@ -65,6 +67,24 @@ function formatElapsed(ms: number): string {
   const seconds = totalSeconds % 60;
   return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 }
+
+/** Local ISO-8601 with numeric offset so the model can resolve "today/tomorrow". */
+function formatClientNowIso(): string {
+  const date = new Date();
+  const offsetMinutes = -date.getTimezoneOffset();
+  const sign = offsetMinutes >= 0 ? '+' : '-';
+  const abs = Math.abs(offsetMinutes);
+  const hours = String(Math.floor(abs / 60)).padStart(2, '0');
+  const minutes = String(abs % 60).padStart(2, '0');
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return `${local.toISOString().slice(0, 19)}${sign}${hours}:${minutes}`;
+}
+
+const SUGGESTION_KEYS = [
+  'suggestionCreateTask',
+  'suggestionMyTasks',
+  'suggestionRememberNote',
+] as const;
 
 export function FamilyChat(): React.JSX.Element {
   const t = useTranslations('Dashboard.voiceChat');
@@ -123,6 +143,22 @@ export function FamilyChat(): React.JSX.Element {
     stopVoiceRef.current = () => voice.stop();
     submitMessageRef.current = submitMessage;
   });
+
+  useEffect(() => {
+    return subscribeFamilyChatSend((text) => {
+      if (statusRef.current === 'streaming' || statusRef.current === 'loadingHistory') {
+        return false;
+      }
+      void submitMessageRef.current(text);
+      return true;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (status === 'idle') {
+      flushFamilyChatSend();
+    }
+  }, [status]);
 
   useEffect(() => {
     const existing = getFamilyChatSnapshot();
@@ -229,6 +265,8 @@ export function FamilyChat(): React.JSX.Element {
         signal: controller.signal,
         body: JSON.stringify({
           locale,
+          clientNow: formatClientNowIso(),
+          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           messages: nextMessages.map((message) => ({
             role: message.role,
             content: message.content,
@@ -362,11 +400,45 @@ export function FamilyChat(): React.JSX.Element {
                 {t('loadingHistory')}
               </div>
             ) : messages.length === 0 ? (
-              <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
+              <div className="flex h-full flex-col items-center justify-center gap-5 px-5 text-center sm:px-8">
                 <OkhanaAvatar size="lg" label={t('assistantName')} />
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-foreground">{t('emptyTitle')}</p>
+                <div className="max-w-sm space-y-1.5">
+                  <p className="text-base font-semibold tracking-tight text-foreground sm:text-lg">
+                    {t('emptyTitle')}
+                  </p>
                   <p className="text-sm text-muted-foreground">{t('emptyHistory')}</p>
+                </div>
+                <div className="flex w-full max-w-md flex-col gap-2.5">
+                  {SUGGESTION_KEYS.map((key, index) => {
+                    const isPrimary = index === 0;
+                    return (
+                      <Button
+                        key={key}
+                        type="button"
+                        variant={isPrimary ? 'default' : 'outline'}
+                        size="lg"
+                        disabled={busy}
+                        className={cn(
+                          'h-auto min-h-12 w-full justify-center rounded-2xl px-4 py-3 text-base whitespace-normal',
+                          isPrimary
+                            ? 'bg-brand-peach text-foreground hover:bg-brand-peach/90'
+                            : 'border-border/70 bg-background/90',
+                        )}
+                        onClick={() => {
+                          void submitMessage(t(key));
+                        }}
+                      >
+                        <span className="flex flex-col items-center gap-0.5">
+                          <span className="font-medium">{t(key)}</span>
+                          {isPrimary ? (
+                            <span className="text-xs font-normal opacity-80">
+                              {t('suggestionCreateTaskHint')}
+                            </span>
+                          ) : null}
+                        </span>
+                      </Button>
+                    );
+                  })}
                 </div>
               </div>
             ) : (
@@ -391,6 +463,25 @@ export function FamilyChat(): React.JSX.Element {
         ) : null}
 
         <CardFooter className="shrink-0 flex-col items-stretch gap-2 border-border/60 bg-muted/20 px-3 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] dark:bg-muted/10">
+          {messages.length > 0 ? (
+            <div className="flex flex-wrap gap-2 px-0.5">
+              {SUGGESTION_KEYS.map((key) => (
+                <Button
+                  key={key}
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={busy || status === 'loadingHistory'}
+                  className="rounded-full border-border/70 bg-background/80 text-xs sm:text-sm"
+                  onClick={() => {
+                    void submitMessage(t(key));
+                  }}
+                >
+                  {t(key)}
+                </Button>
+              ))}
+            </div>
+          ) : null}
           <div
             className={cn(
               'flex items-end gap-2 rounded-2xl border border-border/70 bg-background/90 p-2 shadow-sm',
