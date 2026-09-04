@@ -174,8 +174,8 @@ export function FamilyHubMenu({
   const [selectedMember, setSelectedMember] = useState<DashboardFamilyMemberProfile | null>(null);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3 lg:flex-row lg:gap-4">
-      <aside className="hidden w-72 shrink-0 flex-col gap-4 rounded-2xl border border-border/60 bg-card/80 p-4 shadow-sm backdrop-blur-sm lg:flex xl:w-80">
+    <div className="flex flex-1 flex-col gap-3 lg:min-h-0 lg:flex-row lg:gap-4">
+      <aside className="hidden w-72 shrink-0 flex-col gap-4 rounded-2xl border border-border/60 bg-card/80 p-4 shadow-sm backdrop-blur-sm lg:flex lg:min-h-0 xl:w-80">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 space-y-1">
             <p className="truncate text-xl font-semibold tracking-tight">{familyName}</p>
@@ -207,7 +207,7 @@ export function FamilyHubMenu({
         </div>
       </aside>
 
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
+      <div className="flex min-w-0 flex-1 flex-col gap-3 lg:min-h-0">
         <section className="shrink-0 rounded-2xl border border-border/60 bg-card/80 p-3 shadow-sm backdrop-blur-sm sm:p-4 lg:hidden">
           <div className="mb-3 flex items-center justify-between gap-2">
             <div className="min-w-0">
@@ -234,7 +234,7 @@ export function FamilyHubMenu({
           </ul>
         </section>
 
-        <div className="flex min-h-0 flex-1 flex-col">{children}</div>
+        <div className="flex flex-1 flex-col gap-3 lg:min-h-0">{children}</div>
       </div>
 
       <MemberProfileSheet

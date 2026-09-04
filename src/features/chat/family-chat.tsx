@@ -127,7 +127,13 @@ export function FamilyChat(): React.JSX.Element {
     if (!list) {
       return;
     }
-    list.scrollTop = list.scrollHeight;
+    // Desktop: list is the overflow scroller. Mobile: page scrolls — use scrollIntoView.
+    if (typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches) {
+      list.scrollTop = list.scrollHeight;
+      return;
+    }
+    const last = list.lastElementChild;
+    last?.scrollIntoView({ block: 'end' });
   });
 
   useEffect(() => {
@@ -343,7 +349,15 @@ export function FamilyChat(): React.JSX.Element {
 
   return (
     <TooltipProvider>
-      <Card className="flex h-full min-h-[24rem] w-full flex-1 flex-col gap-0 overflow-hidden border-border/60 bg-card/90 py-0 shadow-sm backdrop-blur-sm sm:min-h-[28rem]">
+      <Card
+        className={cn(
+          'flex w-full flex-1 flex-col gap-0 border-border/60 bg-card/90 py-0 shadow-sm backdrop-blur-sm',
+          // Mobile: let the page scroll — nested chat scroll trapped touches.
+          'max-lg:overflow-visible',
+          // Desktop: fixed-height panel with inner message scroll.
+          'lg:h-full lg:min-h-[28rem] lg:overflow-hidden',
+        )}
+      >
         <CardHeader className="shrink-0 gap-3 border-b border-border/60 px-4 py-3 sm:px-5 sm:py-4">
           <div className="flex items-start gap-3">
             <OkhanaAvatar size="lg" label={t('assistantName')} />
@@ -388,10 +402,14 @@ export function FamilyChat(): React.JSX.Element {
           </div>
         </CardHeader>
 
-        <CardContent className="flex min-h-0 flex-1 flex-col px-0 py-0">
+        <CardContent className="flex flex-1 flex-col px-0 py-0 lg:min-h-0">
           <div
             ref={listRef}
-            className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-4 py-4 sm:px-5 sm:py-5"
+            className={cn(
+              'space-y-5 px-4 py-4 sm:px-5 sm:py-5',
+              'max-lg:overflow-visible',
+              'lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:overscroll-contain',
+            )}
             aria-live="polite"
           >
             {status === 'loadingHistory' ? (

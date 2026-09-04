@@ -7,6 +7,7 @@ import {
   acknowledgeTaskAssignment,
   completeTaskAssignment,
 } from '@/features/tasks/update-assignment';
+import { notifyTaskCompleted } from '@/features/notifications/task-notifications';
 import { db } from '@/lib/server/db';
 import { withDbRetry } from '@/lib/server/db/client';
 import { users } from '@/lib/server/db/schema';
@@ -98,5 +99,10 @@ export async function completeTaskAction(
   if (!result.ok) {
     return { ok: false, error: mapAssignmentError(result.error) };
   }
+  void notifyTaskCompleted({
+    familyId: ctx.familyId,
+    taskId,
+    completedByUserId: ctx.userId,
+  });
   return { ok: true, status: 'done' };
 }

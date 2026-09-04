@@ -1,6 +1,6 @@
-/* Shell-only service worker: installable PWA without offline chat.
- * API and dynamic routes always hit the network. Push hooks can land later. */
-const SHELL_CACHE = 'okhana-shell-v2';
+/* Shell + Web Push service worker.
+ * API and dynamic routes always hit the network. */
+const SHELL_CACHE = 'okhana-shell-v3';
 const SHELL_ASSETS = [
   '/manifest.webmanifest',
   '/favicon.ico',
@@ -23,6 +23,62 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+self.addEventListener('push', (event) => {
+  let title = 'Okhana';
+  let body = '';
+  // Default matches next-intl defaultLocale (ru) — bare /dashboard is not a route.
+  let url = '/ru/dashboard';
+  let tag = 'okhana-task';
+
+  try {
+    const data = event.data ? event.data.json() : null;
+    if (data && typeof data === 'object') {
+      if (typeof data.title === 'string') title = data.title;
+      if (typeof data.body === 'string') body = data.body;
+      if (typeof data.url === 'string') url = data.url;
+      if (typeof data.tag === 'string') tag = data.tag;
+    }
+  } catch {
+    body = event.data ? event.data.text() : '';
+  }
+
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body,
+      tag,
+      data: { url },
+      icon: '/icons/icon-192.png',
+      badge: '/icons/icon-192.png',
+    }),
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const rawUrl = event.notification.data?.url || '/ru/dashboard';
+  // Same-origin paths only — ignore absolute URLs from a poisoned payload.
+  const targetUrl = typeof rawUrl === 'string' && rawUrl.startsWith('/') && !rawUrl.startsWith('//')
+    ? rawUrl
+    : '/ru/dashboard';
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+      for (const client of clients) {
+        if ('focus' in client) {
+          void client.focus();
+          if ('navigate' in client) {
+            void client.navigate(targetUrl);
+          }
+          return;
+        }
+      }
+      if (self.clients.openWindow) {
+        return self.clients.openWindow(targetUrl);
+      }
+      return undefined;
+    }),
+  );
+});
+
 self.addEventListener('fetch', (event) => {
   const request = event.request;
   if (request.method !== 'GET') {
@@ -34,7 +90,6 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Never cache API / auth — chat stays online-only.
   if (
     url.pathname.startsWith('/api/')
     || url.pathname.includes('/sign-in')
@@ -43,7 +98,6 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Navigation: network-first so locale/auth stay fresh.
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request).catch(() => caches.match(request)).then((response) => response),
@@ -51,7 +105,6 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Static shell icons/brand: cache-first.
   if (url.pathname.startsWith('/icons/') || url.pathname.startsWith('/brand/')) {
     event.respondWith(
       caches.match(request).then((cached) => cached || fetch(request).then((response) => {

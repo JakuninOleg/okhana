@@ -5,6 +5,8 @@ import { FamilyHubMenu } from '@/features/family/family-hub-menu';
 import { FamilySetupForm } from '@/features/family/family-setup-form';
 import { getDashboardFamilyData } from '@/features/family/get-dashboard-family';
 import { FamilyChatLoader } from '@/features/chat/family-chat-loader';
+import { FamilyTasksPriority } from '@/features/tasks/family-tasks-priority';
+import { loadDashboardActiveTasks } from '@/features/tasks/load-dashboard-tasks';
 import { isLocale, routing } from '@/i18n/routing';
 import { redirect } from '@/i18n/navigation';
 
@@ -63,6 +65,8 @@ export default async function DashboardPage({
     dbError = data.dbError;
   }
 
+  const activeTasks = hasFamily ? await loadDashboardActiveTasks() : [];
+
   if (!displayName && email) {
     displayName = email.split('@')[0] ?? email;
   }
@@ -107,7 +111,7 @@ export default async function DashboardPage({
   }
 
   return (
-    <main className="flex min-h-0 flex-1 flex-col py-3 sm:py-4">
+    <main className="flex flex-1 flex-col py-3 sm:py-4 lg:min-h-0">
       <FamilyHubMenu
         familyName={familyName!}
         inviteCode={inviteCode!}
@@ -115,6 +119,7 @@ export default async function DashboardPage({
         currentUserId={currentUserId!}
         currentUserRole={currentUserRole!}
       >
+        <FamilyTasksPriority initialTasks={activeTasks} />
         <FamilyChatLoader />
       </FamilyHubMenu>
     </main>
