@@ -39,6 +39,7 @@ import { OkhanaAvatar } from '@/features/chat/okhana-avatar';
 import { playChatSpeech } from '@/features/chat/play-chat-speech';
 import { readOpenAiChatStream } from '@/features/chat/read-openai-stream';
 import { sanitizeChatRequestMessages } from '@/features/chat/sanitize-chat-request-messages';
+import { scrollChatToLatest } from '@/features/chat/scroll-chat-to-latest';
 import {
   getServerTtsEnabledSnapshot,
   getTtsEnabledSnapshot,
@@ -106,6 +107,7 @@ export function FamilyChat(): React.JSX.Element {
   const abortRef = useRef<AbortController | null>(null);
   const speechAbortRef = useRef<AbortController | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
+  const bottomAnchorRef = useRef<HTMLDivElement | null>(null);
   const statusRef = useRef(status);
   const submitMessageRef = useRef<(text?: string) => Promise<void>>(async () => undefined);
   const stopVoiceRef = useRef<() => void>(() => undefined);
@@ -124,13 +126,11 @@ export function FamilyChat(): React.JSX.Element {
   });
 
   const scrollToBottom = useEffectEvent(() => {
-    const list = listRef.current;
-    if (!list) {
-      return;
-    }
-    // Page/column scroll (mobile + desktop) — avoid nested chat scrollports.
-    const last = list.lastElementChild;
-    last?.scrollIntoView({ block: 'end' });
+    const anchor = bottomAnchorRef.current;
+    // After layout so hub-column scrollHeight includes the new bubbles.
+    requestAnimationFrame(() => {
+      scrollChatToLatest(anchor);
+    });
   });
 
   useEffect(() => {
@@ -633,6 +633,8 @@ export function FamilyChat(): React.JSX.Element {
           ) : (
             <p className="px-1 text-xs text-muted-foreground">{t('voiceHoldHint')}</p>
           )}
+          {/* Scroll target: keeps the latest reply + composer in view on page/column scroll. */}
+          <div ref={bottomAnchorRef} className="h-px w-full shrink-0" aria-hidden />
         </CardFooter>
       </Card>
     </TooltipProvider>
