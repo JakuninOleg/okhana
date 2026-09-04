@@ -41,9 +41,9 @@ async function requireFamilyUser(): Promise<{ familyId: number; userId: number }
 
 function mapAssignmentError(message: string): TaskActionErrorCode {
   if (message === 'Task not found') return 'not_found';
-  if (message === 'Task is cancelled' || message === 'Assignment is cancelled') return 'cancelled';
-  if (message.startsWith('Cannot acknowledge')) return 'ack_blocked';
+  if (message === 'Task is cancelled') return 'cancelled';
   if (message === 'Assignment is cancelled') return 'complete_blocked';
+  if (message.startsWith('Cannot acknowledge')) return 'ack_blocked';
   return 'generic';
 }
 

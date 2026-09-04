@@ -102,18 +102,18 @@ describe('task-actions', () => {
     });
   });
 
-  it('completeTaskAction surfaces assignment errors', async () => {
+  it('maps assignment cancelled to complete_blocked', async () => {
     mockAuth.mockResolvedValue({ userId: 'clerk_1' });
     mockSelectLimit.mockResolvedValue([{ id: 2, familyId: 7 }]);
     mockComplete.mockResolvedValue({
       ok: false,
-      error: 'Task not found',
+      error: 'Assignment is cancelled',
     });
     const { completeTaskAction } = await load();
 
     await expect(completeTaskAction(9)).resolves.toEqual({
       ok: false,
-      error: 'not_found',
+      error: 'complete_blocked',
     });
   });
 });
