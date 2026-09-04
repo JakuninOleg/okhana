@@ -108,14 +108,18 @@
       "eyebrow": "Family assistant",
       "assistantName": "Okhana",
       "title": "Chat with Okhana",
-      "description": "Ask Okhana to remember a note, find saved information, or just talk.",
+      "description": "Create tasks, remember notes, find saved information, or just talk.",
       "statusReady": "Ready when you are",
       "statusThinking": "Okhana is responding…",
       "statusRecording": "Listening… release to send",
       "statusRecordingWarn": "Almost at the 5-minute limit — finishing soon",
       "statusTranscribing": "Turning your voice into text…",
-      "emptyTitle": "Start the conversation",
-      "emptyHistory": "History is empty for now. Hold the mic to talk, or type a message.",
+      "emptyTitle": "How can Okhana help?",
+      "emptyHistory": "Pick an action, or just write in your own words.",
+      "suggestionCreateTask": "Create a task",
+      "suggestionCreateTaskHint": "Okhana will ask who and when",
+      "suggestionMyTasks": "What are my tasks?",
+      "suggestionRememberNote": "Remember a note",
       "loadingHistory": "Loading conversation…",
       "thinking": "Okhana is thinking…",
       "voiceInput": "Hold to talk",
@@ -131,6 +135,30 @@
       "send": "Send",
       "requestFailed": "Could not reach Okhana. Try again.",
       "streamUnavailable": "Streaming is not available in this browser."
+    },
+    "tasks": {
+      "open": "Family tasks",
+      "openShort": "Tasks",
+      "title": "Family tasks",
+      "description": "Tasks you created or that were assigned to you.",
+      "tabActive": "Active",
+      "tabCompleted": "Completed",
+      "create": "Create",
+      "createViaChat": "Create a task",
+      "createHint": "Creation is through chat — Okhana will ask who and when.",
+      "loading": "Loading tasks…",
+      "empty": "No tasks here yet.",
+      "dueLabel": "Due {due}",
+      "youCreated": "You created",
+      "progress": "{done}/{total} done",
+      "markSeen": "Mark seen",
+      "markDone": "Mark done",
+      "status": {
+        "pending": "Not seen yet",
+        "seen": "Seen",
+        "done": "Done",
+        "cancelled": "Cancelled"
+      }
     }
   }
 }
