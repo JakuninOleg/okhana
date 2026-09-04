@@ -116,6 +116,21 @@ export const familyTaskAssignees = pgTable('family_task_assignees', {
   index('family_task_assignees_task_idx').on(table.taskId),
 ]);
 
+/** Web Push endpoints per device (PWA notifications for tasks). */
+export const pushSubscriptions = pgTable('push_subscriptions', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  endpoint: text('endpoint').notNull(),
+  p256dh: varchar('p256dh', { length: 255 }).notNull(),
+  auth: varchar('auth', { length: 255 }).notNull(),
+  userAgent: varchar('user_agent', { length: 512 }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex('push_subscriptions_endpoint_uidx').on(table.endpoint),
+  index('push_subscriptions_user_idx').on(table.userId),
+]);
+
 // 7. ai_conversations
 export const aiConversations = pgTable('ai_conversations', {
   id: serial('id').primaryKey(),
@@ -150,6 +165,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   createdEvents: many(events),
   createdTasks: many(familyTasks),
   taskAssignments: many(familyTaskAssignees),
+  pushSubscriptions: many(pushSubscriptions),
   conversations: many(aiConversations),
 }));
 
@@ -171,6 +187,10 @@ export const familyTasksRelations = relations(familyTasks, ({ one, many }) => ({
 export const familyTaskAssigneesRelations = relations(familyTaskAssignees, ({ one }) => ({
   task: one(familyTasks, { fields: [familyTaskAssignees.taskId], references: [familyTasks.id] }),
   user: one(users, { fields: [familyTaskAssignees.userId], references: [users.id] }),
+}));
+
+export const pushSubscriptionsRelations = relations(pushSubscriptions, ({ one }) => ({
+  user: one(users, { fields: [pushSubscriptions.userId], references: [users.id] }),
 }));
 
 export const notesRelations = relations(notes, ({ one }) => ({

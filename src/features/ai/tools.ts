@@ -8,6 +8,10 @@ import {
   acknowledgeTaskAssignment,
   completeTaskAssignment,
 } from '@/features/tasks/update-assignment';
+import {
+  notifyTaskAssigned,
+  notifyTaskCompleted,
+} from '@/features/notifications/task-notifications';
 
 type FamilyRole = 'owner' | 'adult' | 'child';
 
@@ -259,6 +263,12 @@ export async function executeAiTool(
         assigneeUserIds,
         assignToEntireFamily,
       });
+      void notifyTaskAssigned({
+        title: created.title,
+        createdBy: input.userId,
+        assigneeUserIds: created.assigneeUserIds,
+        dueAt: created.dueAt,
+      });
       return { created: true, ...created };
     } catch (error) {
       return { error: error instanceof Error ? error.message : 'Failed to create task' };
@@ -297,11 +307,19 @@ export async function executeAiTool(
     if (!parsed.success) {
       return { error: 'Invalid complete_task arguments' };
     }
-    return completeTaskAssignment({
+    const result = await completeTaskAssignment({
       familyId: input.familyId,
       userId: input.userId,
       taskId: parsed.data.taskId,
     });
+    if (result.ok) {
+      void notifyTaskCompleted({
+        familyId: input.familyId,
+        taskId: parsed.data.taskId,
+        completedByUserId: input.userId,
+      });
+    }
+    return result;
   }
 
   return { error: `Unknown tool: ${name}` };

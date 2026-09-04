@@ -7,6 +7,8 @@ const mockCreateFamilyTask = vi.hoisted(() => vi.fn());
 const mockListVisibleTasks = vi.hoisted(() => vi.fn());
 const mockAcknowledge = vi.hoisted(() => vi.fn());
 const mockComplete = vi.hoisted(() => vi.fn());
+const mockNotifyAssigned = vi.hoisted(() => vi.fn());
+const mockNotifyCompleted = vi.hoisted(() => vi.fn());
 
 vi.mock('@/features/notes/save-note', () => ({
   saveNote: (...args: unknown[]) => mockSaveNote(...args),
@@ -18,6 +20,11 @@ vi.mock('@/features/notes/search-notes', () => ({
 
 vi.mock('@/features/tasks/create-task', () => ({
   createFamilyTask: (...args: unknown[]) => mockCreateFamilyTask(...args),
+}));
+
+vi.mock('@/features/notifications/task-notifications', () => ({
+  notifyTaskAssigned: (...args: unknown[]) => mockNotifyAssigned(...args),
+  notifyTaskCompleted: (...args: unknown[]) => mockNotifyCompleted(...args),
 }));
 
 vi.mock('@/features/tasks/list-tasks', () => ({
@@ -37,6 +44,8 @@ describe('AI tools', () => {
     mockListVisibleTasks.mockReset();
     mockAcknowledge.mockReset();
     mockComplete.mockReset();
+    mockNotifyAssigned.mockReset();
+    mockNotifyCompleted.mockReset();
   });
 
   it('exposes OpenAI-compatible tool definitions for Go-Ai', () => {
@@ -260,6 +269,40 @@ describe('AI tools', () => {
         '{}',
       ),
     ).resolves.toEqual({ error: 'Invalid complete_task arguments' });
+  });
+
+  it('notifies assignees after create_task and creator after complete_task', async () => {
+    mockCreateFamilyTask.mockResolvedValue({
+      taskId: 11,
+      title: 'Buy bread',
+      assigneeUserIds: [2, 3],
+      dueAt: null,
+    });
+    mockComplete.mockResolvedValue({ ok: true, taskId: 11, status: 'done' });
+
+    await executeAiTool(
+      { familyId: 1, userId: 2, familyRole: 'owner' },
+      'create_task',
+      JSON.stringify({ title: 'Buy bread', assigneeUserIds: [3] }),
+    );
+    expect(mockNotifyAssigned).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Buy bread',
+        createdBy: 2,
+        assigneeUserIds: [2, 3],
+      }),
+    );
+
+    await executeAiTool(
+      { familyId: 1, userId: 3, familyRole: 'adult' },
+      'complete_task',
+      JSON.stringify({ taskId: 11 }),
+    );
+    expect(mockNotifyCompleted).toHaveBeenCalledWith({
+      familyId: 1,
+      taskId: 11,
+      completedByUserId: 3,
+    });
   });
 
   it('lists visible tasks for the caller', async () => {

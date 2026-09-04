@@ -43,6 +43,10 @@ vi.mock('@/features/tasks/update-assignment', () => ({
   completeTaskAssignment: (...args: unknown[]) => mockComplete(...args),
 }));
 
+vi.mock('@/features/notifications/task-notifications', () => ({
+  notifyTaskCompleted: vi.fn().mockResolvedValue(undefined),
+}));
+
 describe('task-actions', () => {
   beforeEach(() => {
     vi.clearAllMocks();

@@ -55,6 +55,14 @@ vi.mock('@/features/chat/family-chat-loader', () => ({
   FamilyChatLoader: () => React.createElement('div', null, 'Family chat'),
 }));
 
+vi.mock('@/features/tasks/family-tasks-priority', () => ({
+  FamilyTasksPriority: () => React.createElement('div', null, 'Tasks priority'),
+}));
+
+vi.mock('@/features/tasks/load-dashboard-tasks', () => ({
+  loadDashboardActiveTasks: vi.fn().mockResolvedValue([]),
+}));
+
 vi.mock('@/features/family/family-hub-menu', () => ({
   FamilyHubMenu: ({
     familyName,
