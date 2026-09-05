@@ -142,7 +142,7 @@ export function MemberProfileSheet({
         onOpenChange(next);
       }}
     >
-      <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-md">
+      <SheetContent side="center" className="overflow-y-auto">
         <SheetHeader className="border-b border-border/60 pb-4">
           <div className="flex items-center gap-4">
             <FamilyMemberAvatar member={activeMember} size="2xl" showOwnerBadge />

@@ -145,7 +145,7 @@ function FamilySettingsSheet({
       >
         <Settings2 className="size-5" />
       </SheetTrigger>
-      <SheetContent side="right" className="w-full sm:max-w-md">
+      <SheetContent side="center" className="overflow-y-auto">
         <SheetHeader className="border-b border-border/60 pb-4">
           <SheetTitle>{t('familySettings')}</SheetTitle>
           <SheetDescription>{familyName}</SheetDescription>
