@@ -174,8 +174,17 @@ export function FamilyHubMenu({
   const [selectedMember, setSelectedMember] = useState<DashboardFamilyMemberProfile | null>(null);
 
   return (
-    <div className="flex flex-1 flex-col gap-3 lg:min-h-0 lg:flex-row lg:gap-4">
-      <aside className="hidden w-72 shrink-0 flex-col gap-4 rounded-2xl border border-border/60 bg-card/80 p-4 shadow-sm backdrop-blur-sm lg:flex xl:w-80">
+    <div className="flex flex-1 flex-col gap-3 lg:flex-row lg:items-start lg:gap-4">
+      {/*
+        Sticky on desktop so the family rail stays put while tasks/chat scroll with the page.
+        (Earlier we only removed the *inner* members scrollport — the aside still rode page scroll.)
+      */}
+      <aside
+        className={cn(
+          'hidden w-72 shrink-0 flex-col gap-4 rounded-2xl border border-border/60 bg-card/80 p-4 shadow-sm backdrop-blur-sm xl:w-80',
+          'lg:sticky lg:top-20 lg:flex lg:max-h-[calc(100dvh-5.5rem)]',
+        )}
+      >
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 space-y-1">
             <p className="truncate text-xl font-semibold tracking-tight">{familyName}</p>
@@ -189,7 +198,6 @@ export function FamilyHubMenu({
           </div>
         </div>
 
-        {/* Fixed rail — small member count; do not nest a scrollport here. */}
         <div className="shrink-0 space-y-2">
           <p className="px-1 text-xs font-medium uppercase tracking-[0.16em] text-brand-peach">
             {t('membersTitle')}
@@ -208,7 +216,8 @@ export function FamilyHubMenu({
         </div>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col gap-3 lg:min-h-0 lg:overflow-y-auto">
+      {/* Page scrolls on both breakpoints — no nested hub-column scrollport. */}
+      <div className="flex min-w-0 flex-1 flex-col gap-3">
         <section className="shrink-0 rounded-2xl border border-border/60 bg-card/80 p-3 shadow-sm backdrop-blur-sm sm:p-4 lg:hidden">
           <div className="mb-3 flex items-center justify-between gap-2">
             <div className="min-w-0">
@@ -235,7 +244,6 @@ export function FamilyHubMenu({
           </ul>
         </section>
 
-        {/* Natural height children — desktop scrolls this column; mobile scrolls the page. */}
         <div className="flex flex-col gap-3">{children}</div>
       </div>
 
