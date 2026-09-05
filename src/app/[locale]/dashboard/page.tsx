@@ -84,7 +84,7 @@ export default async function DashboardPage({
 
   if (!hasFamily) {
     return (
-      <main className="relative flex flex-1 flex-col py-6 sm:py-10">
+      <main className="relative flex flex-1 flex-col overflow-y-auto py-6 sm:py-10">
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--brand-sun)_0%,_transparent_55%),radial-gradient(ellipse_at_bottom,_var(--brand-aqua)_0%,_transparent_50%)] opacity-60 dark:opacity-20"
@@ -111,7 +111,7 @@ export default async function DashboardPage({
   }
 
   return (
-    <main className="flex flex-1 flex-col py-3 sm:py-4 lg:min-h-0">
+    <main className="flex min-h-0 flex-1 flex-col py-3 sm:py-4 lg:overflow-hidden">
       <FamilyHubMenu
         familyName={familyName!}
         inviteCode={inviteCode!}
