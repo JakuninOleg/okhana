@@ -79,7 +79,7 @@ export default async function LocaleLayout({
 
   return (
     <html lang={locale} className={`${theme} ${plusJakartaSans.variable} ${geistMono.variable}`}>
-      <body className="flex min-h-dvh flex-col">
+      <body className="flex min-h-dvh flex-col lg:h-dvh lg:overflow-hidden">
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
@@ -87,7 +87,7 @@ export default async function LocaleLayout({
         <ClerkProvider appearance={clerkAppearance}>
           <NextIntlClientProvider messages={messages}>
             <Navbar locale={locale} />
-            <Container className="flex flex-1 flex-col pb-[env(safe-area-inset-bottom)] lg:min-h-0">
+            <Container className="flex min-h-0 flex-1 flex-col pb-[env(safe-area-inset-bottom)]">
               {children}
             </Container>
             <PwaRegister />

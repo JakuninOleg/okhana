@@ -34,7 +34,7 @@ describe('scrollChatToLatest', () => {
     vi.restoreAllMocks();
   });
 
-  it('scrolls the nearest overflow parent when the hub column is the scroller', () => {
+  it('scrolls the nearest overflow parent when the chat list is the scroller', () => {
     const column = fakeElement();
     const anchor = fakeElement(column);
 

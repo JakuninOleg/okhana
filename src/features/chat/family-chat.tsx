@@ -371,8 +371,8 @@ export function FamilyChat(): React.JSX.Element {
       <Card
         className={cn(
           'flex w-full flex-1 flex-col gap-0 border-border/60 bg-card/90 py-0 shadow-sm backdrop-blur-sm',
-          // No nested chat scrollport — mobile uses page scroll; desktop uses the hub column.
-          'overflow-visible',
+          // Mobile: page scrolls. Desktop: card fills remaining height; messages scroll inside.
+          'min-h-[24rem] overflow-visible lg:min-h-0 lg:overflow-hidden',
         )}
       >
         <CardHeader className="shrink-0 gap-3 border-b border-border/60 px-4 py-3 sm:px-5 sm:py-4">
@@ -419,10 +419,10 @@ export function FamilyChat(): React.JSX.Element {
           </div>
         </CardHeader>
 
-        <CardContent className="flex flex-1 flex-col px-0 py-0">
+        <CardContent className="flex min-h-0 flex-1 flex-col px-0 py-0 lg:overflow-hidden">
           <div
             ref={listRef}
-            className="space-y-5 overflow-visible px-4 py-4 sm:px-5 sm:py-5"
+            className="min-h-0 flex-1 space-y-5 overflow-visible px-4 py-4 sm:px-5 sm:py-5 lg:overflow-y-auto lg:overscroll-contain"
             aria-live="polite"
           >
             {status === 'loadingHistory' ? (

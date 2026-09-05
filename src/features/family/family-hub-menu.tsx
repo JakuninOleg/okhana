@@ -174,15 +174,12 @@ export function FamilyHubMenu({
   const [selectedMember, setSelectedMember] = useState<DashboardFamilyMemberProfile | null>(null);
 
   return (
-    <div className="flex flex-1 flex-col gap-3 lg:flex-row lg:items-start lg:gap-4">
-      {/*
-        Sticky on desktop so the family rail stays put while tasks/chat scroll with the page.
-        (Earlier we only removed the *inner* members scrollport — the aside still rode page scroll.)
-      */}
+    <div className="flex flex-1 flex-col gap-3 lg:min-h-0 lg:flex-row lg:gap-4 lg:overflow-hidden">
+      {/* Desktop: fixed-height shell — page does not scroll; chat owns the scrollport. */}
       <aside
         className={cn(
           'hidden w-72 shrink-0 flex-col gap-4 rounded-2xl border border-border/60 bg-card/80 p-4 shadow-sm backdrop-blur-sm xl:w-80',
-          'lg:sticky lg:top-20 lg:flex lg:max-h-[calc(100dvh-5.5rem)]',
+          'lg:flex lg:overflow-y-auto',
         )}
       >
         <div className="flex items-start justify-between gap-2">
@@ -216,8 +213,7 @@ export function FamilyHubMenu({
         </div>
       </aside>
 
-      {/* Page scrolls on both breakpoints — no nested hub-column scrollport. */}
-      <div className="flex min-w-0 flex-1 flex-col gap-3">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 lg:overflow-hidden">
         <section className="shrink-0 rounded-2xl border border-border/60 bg-card/80 p-3 shadow-sm backdrop-blur-sm sm:p-4 lg:hidden">
           <div className="mb-3 flex items-center justify-between gap-2">
             <div className="min-w-0">
@@ -244,7 +240,8 @@ export function FamilyHubMenu({
           </ul>
         </section>
 
-        <div className="flex flex-col gap-3">{children}</div>
+        {/* Tasks shrink-0; chat flex-1 — only the message list scrolls on lg+. */}
+        <div className="flex min-h-0 flex-1 flex-col gap-3">{children}</div>
       </div>
 
       <MemberProfileSheet
