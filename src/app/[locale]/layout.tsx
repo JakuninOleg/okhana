@@ -87,7 +87,7 @@ export default async function LocaleLayout({
         <ClerkProvider appearance={clerkAppearance}>
           <NextIntlClientProvider messages={messages}>
             <Navbar locale={locale} />
-            <Container className="flex min-h-0 flex-1 flex-col pb-[env(safe-area-inset-bottom)]">
+            <Container className="flex min-h-0 flex-1 flex-col overflow-y-auto pb-[env(safe-area-inset-bottom)]">
               {children}
             </Container>
             <PwaRegister />

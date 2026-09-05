@@ -126,10 +126,13 @@ export function FamilyChat(): React.JSX.Element {
   });
 
   const scrollToBottom = useEffectEvent(() => {
+    const list = listRef.current;
     const anchor = bottomAnchorRef.current;
-    // After layout so hub-column scrollHeight includes the new bubbles.
+    // After layout so scrollHeight includes the new bubbles.
     requestAnimationFrame(() => {
-      scrollChatToLatest(anchor);
+      // Desktop: list is the scrollport (footer anchor sits outside it).
+      // Mobile: list is overflow-visible — fall back to page/footer scroll.
+      scrollChatToLatest(anchor, list);
     });
   });
 
@@ -633,7 +636,7 @@ export function FamilyChat(): React.JSX.Element {
           ) : (
             <p className="px-1 text-xs text-muted-foreground">{t('voiceHoldHint')}</p>
           )}
-          {/* Scroll target: keeps the latest reply + composer in view on page/column scroll. */}
+          {/* Mobile page-scroll target (desktop scrolls listRef instead). */}
           <div ref={bottomAnchorRef} className="h-px w-full shrink-0" aria-hidden />
         </CardFooter>
       </Card>

@@ -15,8 +15,25 @@ export function findVerticalScrollParent(start: Element | null): HTMLElement | n
   return null;
 }
 
-/** Pin the chat thread to the latest message inside page or chat-list scrollports. */
-export function scrollChatToLatest(anchor: HTMLElement | null): void {
+function isVerticalScrollport(el: HTMLElement): boolean {
+  const overflowY = window.getComputedStyle(el).overflowY;
+  return overflowY === 'auto' || overflowY === 'scroll' || overflowY === 'overlay';
+}
+
+/**
+ * Pin the chat thread to the latest message.
+ * Prefer an explicit message-list scrollport (desktop); otherwise walk from `anchor`
+ * (mobile page scroll / footer target).
+ */
+export function scrollChatToLatest(
+  anchor: HTMLElement | null,
+  preferredScrollport?: HTMLElement | null,
+): void {
+  if (preferredScrollport && isVerticalScrollport(preferredScrollport)) {
+    preferredScrollport.scrollTop = preferredScrollport.scrollHeight;
+    return;
+  }
+
   if (!anchor) {
     return;
   }

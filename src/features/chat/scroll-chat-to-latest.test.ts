@@ -47,6 +47,22 @@ describe('scrollChatToLatest', () => {
     expect(column.scrollTop).toBe(900);
   });
 
+  it('prefers an explicit message-list scrollport over the footer anchor', () => {
+    const list = fakeElement();
+    const footerAnchor = fakeElement();
+
+    (window.getComputedStyle as ReturnType<typeof vi.fn>).mockImplementation((el: FakeEl) => ({
+      overflowY: el === list ? 'auto' : 'visible',
+    }));
+
+    scrollChatToLatest(
+      footerAnchor as unknown as HTMLElement,
+      list as unknown as HTMLElement,
+    );
+    expect(list.scrollTop).toBe(900);
+    expect(footerAnchor.scrollIntoView).not.toHaveBeenCalled();
+  });
+
   it('falls back to scrollIntoView when no overflow parent exists', () => {
     const anchor = fakeElement();
 
