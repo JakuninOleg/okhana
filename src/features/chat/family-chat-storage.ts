@@ -4,6 +4,16 @@ export type FamilyChatMessage = {
   content: string;
 };
 
+/** Keep the on-screen thread short so "create task" lands at the composer without endless scroll. */
+export const FAMILY_CHAT_UI_WINDOW = 30;
+
+export function trimFamilyChatMessages(messages: FamilyChatMessage[]): FamilyChatMessage[] {
+  if (messages.length <= FAMILY_CHAT_UI_WINDOW) {
+    return messages;
+  }
+  return messages.slice(-FAMILY_CHAT_UI_WINDOW);
+}
+
 const SESSION_MESSAGES_KEY = 'okhana.familyChat.messages.v1';
 const LOCAL_DRAFT_KEY = 'okhana.familyChat.draft.v1';
 /** Legacy key — messages+draft were bundled in sessionStorage before draft moved to localStorage. */
@@ -86,11 +96,15 @@ function readMessagesFromSession(): FamilyChatMessage[] {
 
 function writeMessagesToSession(messages: FamilyChatMessage[]): void {
   try {
-    if (messages.length === 0) {
+    const trimmed = trimFamilyChatMessages(messages);
+    if (trimmed.length === 0) {
       window.sessionStorage.removeItem(SESSION_MESSAGES_KEY);
       return;
     }
-    window.sessionStorage.setItem(SESSION_MESSAGES_KEY, JSON.stringify({ messages } satisfies StoredMessages));
+    window.sessionStorage.setItem(
+      SESSION_MESSAGES_KEY,
+      JSON.stringify({ messages: trimmed } satisfies StoredMessages),
+    );
   } catch {
     // Private mode / quota — chat still works without session persistence.
   }
@@ -126,7 +140,7 @@ export function readStoredFamilyChat(): { messages: FamilyChatMessage[]; input: 
     }
   }
 
-  return { messages, input };
+  return { messages: trimFamilyChatMessages(messages), input };
 }
 
 export function writeStoredFamilyChat(input: {
@@ -137,6 +151,6 @@ export function writeStoredFamilyChat(input: {
     return;
   }
 
-  writeMessagesToSession(input.messages);
+  writeMessagesToSession(trimFamilyChatMessages(input.messages));
   writeDraftToLocalStorage(input.input);
 }

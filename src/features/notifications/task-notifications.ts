@@ -3,7 +3,7 @@ import { sendPushToUsers } from '@/features/notifications/web-push';
 import { routing } from '@/i18n/routing';
 import { db } from '@/lib/server/db';
 import { withDbRetry } from '@/lib/server/db/client';
-import { familyTasks } from '@/lib/server/db/schema';
+import { familyTasks, users } from '@/lib/server/db/schema';
 
 /** Locale-prefixed dashboard path for notification deep links (app has no bare /dashboard). */
 export function taskNotificationUrl(localePath?: string): string {
@@ -72,5 +72,56 @@ export async function notifyTaskCompleted(input: {
     body: `✓ ${task.title}`,
     url: taskNotificationUrl(input.localePath),
     tag: `task-done-${input.taskId}`,
+  });
+}
+
+/**
+ * Push to the creator when an assignee acknowledges (sees / takes on) the task.
+ */
+export async function notifyTaskAcknowledged(input: {
+  familyId: number;
+  taskId: number;
+  acknowledgedByUserId: number;
+  localePath?: string;
+}): Promise<void> {
+  const row = await withDbRetry(async () => {
+    const [task] = await db
+      .select({
+        title: familyTasks.title,
+        createdBy: familyTasks.createdBy,
+      })
+      .from(familyTasks)
+      .where(and(
+        eq(familyTasks.id, input.taskId),
+        eq(familyTasks.familyId, input.familyId),
+      ))
+      .limit(1);
+
+    if (!task?.createdBy || task.createdBy === input.acknowledgedByUserId) {
+      return null;
+    }
+
+    const [actor] = await db
+      .select({
+        displayName: users.displayName,
+        email: users.email,
+      })
+      .from(users)
+      .where(eq(users.id, input.acknowledgedByUserId))
+      .limit(1);
+
+    const actorLabel = actor?.displayName?.trim() || actor?.email?.split('@')[0] || 'Family';
+    return { title: task.title, createdBy: task.createdBy, actorLabel };
+  });
+
+  if (!row) {
+    return;
+  }
+
+  await sendPushToUsers([row.createdBy], {
+    title: 'Okhana',
+    body: `${row.actorLabel} · ${row.title}`,
+    url: taskNotificationUrl(input.localePath),
+    tag: `task-ack-${input.taskId}-${input.acknowledgedByUserId}`,
   });
 }

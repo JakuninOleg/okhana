@@ -118,7 +118,7 @@ describe('acknowledgeTaskAssignment', () => {
     const { acknowledgeTaskAssignment } = await load();
     await expect(
       acknowledgeTaskAssignment({ familyId: 1, userId: 2, taskId: 9 }),
-    ).resolves.toEqual({ ok: true, taskId: 9, status: 'seen' });
+    ).resolves.toEqual({ ok: true, taskId: 9, status: 'seen', changed: false });
     expect(mockUpdateSet).not.toHaveBeenCalled();
   });
 
@@ -132,7 +132,7 @@ describe('acknowledgeTaskAssignment', () => {
 
     await expect(
       acknowledgeTaskAssignment({ familyId: 1, userId: 2, taskId: 9 }),
-    ).resolves.toEqual({ ok: true, taskId: 9, status: 'seen' });
+    ).resolves.toEqual({ ok: true, taskId: 9, status: 'seen', changed: true });
 
     expect(mockUpdateSet).toHaveBeenCalledWith(
       expect.objectContaining({ status: 'seen', seenAt: expect.any(Date) }),
@@ -166,7 +166,7 @@ describe('completeTaskAssignment', () => {
     const { completeTaskAssignment } = await load();
     await expect(
       completeTaskAssignment({ familyId: 1, userId: 2, taskId: 9 }),
-    ).resolves.toEqual({ ok: true, taskId: 9, status: 'done' });
+    ).resolves.toEqual({ ok: true, taskId: 9, status: 'done', changed: false });
     expect(mockUpdateSet).not.toHaveBeenCalled();
   });
 
@@ -180,7 +180,7 @@ describe('completeTaskAssignment', () => {
 
     await expect(
       completeTaskAssignment({ familyId: 1, userId: 2, taskId: 9 }),
-    ).resolves.toEqual({ ok: true, taskId: 9, status: 'done' });
+    ).resolves.toEqual({ ok: true, taskId: 9, status: 'done', changed: true });
 
     expect(mockUpdateSet).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -202,7 +202,7 @@ describe('completeTaskAssignment', () => {
 
     await expect(
       completeTaskAssignment({ familyId: 1, userId: 2, taskId: 9 }),
-    ).resolves.toEqual({ ok: true, taskId: 9, status: 'done' });
+    ).resolves.toEqual({ ok: true, taskId: 9, status: 'done', changed: true });
 
     expect(mockUpdateSet).toHaveBeenCalledWith(
       expect.objectContaining({

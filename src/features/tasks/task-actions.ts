@@ -7,7 +7,7 @@ import {
   acknowledgeTaskAssignment,
   completeTaskAssignment,
 } from '@/features/tasks/update-assignment';
-import { notifyTaskCompleted } from '@/features/notifications/task-notifications';
+import { notifyTaskAcknowledged, notifyTaskCompleted } from '@/features/notifications/task-notifications';
 import { db } from '@/lib/server/db';
 import { withDbRetry } from '@/lib/server/db/client';
 import { users } from '@/lib/server/db/schema';
@@ -80,6 +80,13 @@ export async function acknowledgeTaskAction(
   if (!result.ok) {
     return { ok: false, error: mapAssignmentError(result.error) };
   }
+  if (result.changed) {
+    void notifyTaskAcknowledged({
+      familyId: ctx.familyId,
+      taskId,
+      acknowledgedByUserId: ctx.userId,
+    });
+  }
   return { ok: true, status: 'seen' };
 }
 
@@ -99,10 +106,12 @@ export async function completeTaskAction(
   if (!result.ok) {
     return { ok: false, error: mapAssignmentError(result.error) };
   }
-  void notifyTaskCompleted({
-    familyId: ctx.familyId,
-    taskId,
-    completedByUserId: ctx.userId,
-  });
+  if (result.ok && result.changed) {
+    void notifyTaskCompleted({
+      familyId: ctx.familyId,
+      taskId,
+      completedByUserId: ctx.userId,
+    });
+  }
   return { ok: true, status: 'done' };
 }

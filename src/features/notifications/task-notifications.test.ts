@@ -1,7 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockSendPushToUsers = vi.hoisted(() => vi.fn());
-const mockSelectLimit = vi.hoisted(() => vi.fn());
+const selectQueue = vi.hoisted(() => {
+  const rows: unknown[][] = [];
+  return {
+    reset(next: unknown[][]) {
+      rows.length = 0;
+      rows.push(...next);
+    },
+    next() {
+      return rows.shift() ?? [];
+    },
+  };
+});
 
 vi.mock('@/features/notifications/web-push', () => ({
   sendPushToUsers: (...args: unknown[]) => mockSendPushToUsers(...args),
@@ -16,7 +27,7 @@ vi.mock('@/lib/server/db', () => ({
     select: vi.fn(() => ({
       from: vi.fn(() => ({
         where: vi.fn(() => ({
-          limit: vi.fn(() => mockSelectLimit()),
+          limit: vi.fn(() => Promise.resolve(selectQueue.next())),
         })),
       })),
     })),
@@ -25,6 +36,7 @@ vi.mock('@/lib/server/db', () => ({
 
 vi.mock('@/lib/server/db/schema', () => ({
   familyTasks: { id: 'id', familyId: 'family_id', title: 'title', createdBy: 'created_by' },
+  users: { id: 'id', displayName: 'display_name', email: 'email' },
 }));
 
 vi.mock('drizzle-orm', () => ({
@@ -35,7 +47,7 @@ vi.mock('drizzle-orm', () => ({
 describe('task notifications', () => {
   beforeEach(() => {
     mockSendPushToUsers.mockReset();
-    mockSelectLimit.mockReset();
+    selectQueue.reset([]);
   });
 
   it('notifyTaskAssigned pushes only to assignees other than the creator', async () => {
@@ -73,7 +85,7 @@ describe('task notifications', () => {
   });
 
   it('notifyTaskCompleted pushes the creator when someone else finishes', async () => {
-    mockSelectLimit.mockResolvedValue([{ title: 'Buy milk', createdBy: 1 }]);
+    selectQueue.reset([[{ title: 'Buy milk', createdBy: 1 }]]);
     const { notifyTaskCompleted } = await import('./task-notifications');
 
     await notifyTaskCompleted({
@@ -93,13 +105,49 @@ describe('task notifications', () => {
   });
 
   it('notifyTaskCompleted does not push when the creator completes their own row', async () => {
-    mockSelectLimit.mockResolvedValue([{ title: 'Buy milk', createdBy: 1 }]);
+    selectQueue.reset([[{ title: 'Buy milk', createdBy: 1 }]]);
     const { notifyTaskCompleted } = await import('./task-notifications');
 
     await notifyTaskCompleted({
       familyId: 10,
       taskId: 55,
       completedByUserId: 1,
+    });
+
+    expect(mockSendPushToUsers).not.toHaveBeenCalled();
+  });
+
+  it('notifyTaskAcknowledged pushes the creator with the assignee label', async () => {
+    selectQueue.reset([
+      [{ title: 'Buy milk', createdBy: 1 }],
+      [{ displayName: 'Masha', email: 'masha@example.com' }],
+    ]);
+    const { notifyTaskAcknowledged } = await import('./task-notifications');
+
+    await notifyTaskAcknowledged({
+      familyId: 10,
+      taskId: 55,
+      acknowledgedByUserId: 2,
+    });
+
+    expect(mockSendPushToUsers).toHaveBeenCalledWith(
+      [1],
+      expect.objectContaining({
+        body: 'Masha · Buy milk',
+        url: '/ru/dashboard',
+        tag: 'task-ack-55-2',
+      }),
+    );
+  });
+
+  it('notifyTaskAcknowledged does not push when the creator acks their own row', async () => {
+    selectQueue.reset([[{ title: 'Buy milk', createdBy: 1 }]]);
+    const { notifyTaskAcknowledged } = await import('./task-notifications');
+
+    await notifyTaskAcknowledged({
+      familyId: 10,
+      taskId: 55,
+      acknowledgedByUserId: 1,
     });
 
     expect(mockSendPushToUsers).not.toHaveBeenCalled();

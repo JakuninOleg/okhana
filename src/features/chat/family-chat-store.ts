@@ -1,6 +1,7 @@
 import type { FamilyChatMessage } from '@/features/chat/family-chat-storage';
 import {
   readStoredFamilyChat,
+  trimFamilyChatMessages,
   writeStoredFamilyChat,
 } from '@/features/chat/family-chat-storage';
 
@@ -28,8 +29,12 @@ function readCachedSnapshot(): FamilyChatSnapshot {
 }
 
 function commitSnapshot(snapshot: FamilyChatSnapshot): void {
-  cachedSnapshot = snapshot;
-  writeStoredFamilyChat(snapshot);
+  const next = {
+    messages: trimFamilyChatMessages(snapshot.messages),
+    input: snapshot.input,
+  };
+  cachedSnapshot = next;
+  writeStoredFamilyChat(next);
   emitChange();
 }
 
@@ -92,6 +97,10 @@ export function requestFamilyChatSend(text: string): void {
   const trimmed = text.trim();
   if (!trimmed) {
     return;
+  }
+  // Jump to the bounded chat card so create-task does not require scrolling the whole thread.
+  if (typeof document !== 'undefined') {
+    document.getElementById('family-chat')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
   pendingSendText = trimmed;
   window.dispatchEvent(new Event(SEND_EVENT));

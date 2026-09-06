@@ -372,10 +372,11 @@ export function FamilyChat(): React.JSX.Element {
   return (
     <TooltipProvider>
       <Card
+        id="family-chat"
         className={cn(
           'flex w-full flex-1 flex-col gap-0 border-border/60 bg-card/90 py-0 shadow-sm backdrop-blur-sm',
-          // Mobile: page scrolls. Desktop: card fills remaining height; messages scroll inside.
-          'min-h-[24rem] overflow-visible lg:min-h-0 lg:overflow-hidden',
+          // Bounded window: message list scrolls inside; desktop fills remaining hub height.
+          'min-h-[20rem] max-h-[min(70dvh,36rem)] overflow-hidden lg:max-h-none lg:min-h-0',
         )}
       >
         <CardHeader className="shrink-0 gap-3 border-b border-border/60 px-4 py-3 sm:px-5 sm:py-4">
@@ -422,10 +423,10 @@ export function FamilyChat(): React.JSX.Element {
           </div>
         </CardHeader>
 
-        <CardContent className="flex min-h-0 flex-1 flex-col px-0 py-0 lg:overflow-hidden">
+        <CardContent className="flex min-h-0 flex-1 flex-col overflow-hidden px-0 py-0">
           <div
             ref={listRef}
-            className="min-h-0 flex-1 space-y-5 overflow-visible px-4 py-4 sm:px-5 sm:py-5 lg:overflow-y-auto lg:overscroll-contain"
+            className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-4 py-4 sm:px-5 sm:py-5"
             aria-live="polite"
           >
             {status === 'loadingHistory' ? (

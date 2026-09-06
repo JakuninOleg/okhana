@@ -8,6 +8,7 @@ const mockListVisibleTasks = vi.hoisted(() => vi.fn());
 const mockAcknowledge = vi.hoisted(() => vi.fn());
 const mockComplete = vi.hoisted(() => vi.fn());
 const mockNotifyAssigned = vi.hoisted(() => vi.fn());
+const mockNotifyAcknowledged = vi.hoisted(() => vi.fn());
 const mockNotifyCompleted = vi.hoisted(() => vi.fn());
 
 vi.mock('@/features/notes/save-note', () => ({
@@ -24,6 +25,7 @@ vi.mock('@/features/tasks/create-task', () => ({
 
 vi.mock('@/features/notifications/task-notifications', () => ({
   notifyTaskAssigned: (...args: unknown[]) => mockNotifyAssigned(...args),
+  notifyTaskAcknowledged: (...args: unknown[]) => mockNotifyAcknowledged(...args),
   notifyTaskCompleted: (...args: unknown[]) => mockNotifyCompleted(...args),
 }));
 
@@ -233,8 +235,8 @@ describe('AI tools', () => {
   });
 
   it('acknowledges and completes tasks via tools', async () => {
-    mockAcknowledge.mockResolvedValue({ ok: true, taskId: 9, status: 'seen' });
-    mockComplete.mockResolvedValue({ ok: true, taskId: 9, status: 'done' });
+    mockAcknowledge.mockResolvedValue({ ok: true, taskId: 9, status: 'seen', changed: true });
+    mockComplete.mockResolvedValue({ ok: true, taskId: 9, status: 'done', changed: true });
 
     await expect(
       executeAiTool(
@@ -242,7 +244,12 @@ describe('AI tools', () => {
         'acknowledge_task',
         JSON.stringify({ taskId: 9 }),
       ),
-    ).resolves.toEqual({ ok: true, taskId: 9, status: 'seen' });
+    ).resolves.toEqual({ ok: true, taskId: 9, status: 'seen', changed: true });
+    expect(mockNotifyAcknowledged).toHaveBeenCalledWith({
+      familyId: 1,
+      taskId: 9,
+      acknowledgedByUserId: 2,
+    });
 
     await expect(
       executeAiTool(
@@ -250,7 +257,12 @@ describe('AI tools', () => {
         'complete_task',
         JSON.stringify({ taskId: 9 }),
       ),
-    ).resolves.toEqual({ ok: true, taskId: 9, status: 'done' });
+    ).resolves.toEqual({ ok: true, taskId: 9, status: 'done', changed: true });
+    expect(mockNotifyCompleted).toHaveBeenCalledWith({
+      familyId: 1,
+      taskId: 9,
+      completedByUserId: 2,
+    });
   });
 
   it('rejects invalid acknowledge_task / complete_task args', async () => {
@@ -278,7 +290,7 @@ describe('AI tools', () => {
       assigneeUserIds: [2, 3],
       dueAt: null,
     });
-    mockComplete.mockResolvedValue({ ok: true, taskId: 11, status: 'done' });
+    mockComplete.mockResolvedValue({ ok: true, taskId: 11, status: 'done', changed: true });
 
     await executeAiTool(
       { familyId: 1, userId: 2, familyRole: 'owner' },

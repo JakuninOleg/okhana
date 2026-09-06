@@ -149,17 +149,16 @@ export function FamilyDatesSheet(): React.JSX.Element {
 
         <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 py-4">
           {canManage ? (
-            <div className="flex justify-end">
-              <Button
-                type="button"
-                size="sm"
-                variant={showForm ? 'outline' : 'default'}
-                onClick={() => setShowForm((value) => !value)}
-              >
-                <Plus className="size-3.5" />
-                {showForm ? t('cancelAdd') : t('add')}
-              </Button>
-            </div>
+            <Button
+              type="button"
+              size="sm"
+              className="w-full"
+              variant={showForm ? 'outline' : 'default'}
+              onClick={() => setShowForm((value) => !value)}
+            >
+              <Plus className="size-3.5" />
+              {showForm ? t('cancelAdd') : t('add')}
+            </Button>
           ) : null}
 
           {showForm && canManage ? (
