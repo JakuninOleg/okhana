@@ -35,6 +35,11 @@ export const users = pgTable('users', {
   kinshipLabel: varchar('kinship_label', { length: 64 }),
   /** Hex color for calendar chips, e.g. #E89B6C */
   profileColor: varchar('profile_color', { length: 7 }),
+  /**
+   * When true, skip proactive cron pushes (nudges/briefings) during
+   * 22:00–08:00 Europe/Moscow. Urgent task assign push still allowed.
+   */
+  quietHoursEnabled: boolean('quiet_hours_enabled').default(false).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [
   index('users_clerk_id_idx').on(table.clerkId),

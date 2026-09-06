@@ -392,6 +392,9 @@ export function FamilyChat(): React.JSX.Element {
                   {t('title')}
                 </CardTitle>
                 <CardDescription className="hidden sm:block">{t('description')}</CardDescription>
+                <p className="text-[0.7rem] leading-snug text-muted-foreground/90 sm:text-xs">
+                  {t('trustHint')}
+                </p>
               </div>
               {locale === 'en' ? (
                 <div className="flex w-fit max-w-full items-center gap-2 rounded-xl border border-border/60 bg-muted/30 px-2.5 py-1.5">

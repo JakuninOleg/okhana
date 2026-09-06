@@ -1,0 +1,1 @@
+ALTER TABLE "users" ADD COLUMN "quiet_hours_enabled" boolean DEFAULT false NOT NULL;

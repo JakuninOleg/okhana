@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockSelectLimit = vi.hoisted(() => vi.fn());
 const mockDeleteWhere = vi.hoisted(() => vi.fn());
+const mockUpdateWhere = vi.hoisted(() => vi.fn());
+const mockUpdateSet = vi.hoisted(() => vi.fn());
 const mockSelectWhere = vi.hoisted(() => vi.fn());
 const mockSelectFrom = vi.hoisted(() => vi.fn());
 const mockSelectOrderBy = vi.hoisted(() => vi.fn());
@@ -29,6 +31,9 @@ vi.mock('@/lib/server/db', () => ({
     delete: vi.fn(() => ({
       where: (...args: unknown[]) => mockDeleteWhere(...args),
     })),
+    update: vi.fn(() => ({
+      set: (...args: unknown[]) => mockUpdateSet(...args),
+    })),
   },
 }));
 
@@ -40,6 +45,7 @@ vi.mock('@/lib/server/db/schema', () => ({
     content: 'content',
     category: 'category',
     privacyLevel: 'privacy_level',
+    hiddenFrom: 'hidden_from',
     createdBy: 'created_by',
     createdAt: 'created_at',
   },
@@ -51,10 +57,12 @@ vi.mock('drizzle-orm', () => ({
   eq: vi.fn((...args: unknown[]) => args),
 }));
 
-describe('listVisibleNotes / deleteVisibleNote', () => {
+describe('listVisibleNotes / deleteVisibleNote / updateVisibleNotePrivacy', () => {
   beforeEach(() => {
     mockSelectLimit.mockReset();
     mockDeleteWhere.mockReset();
+    mockUpdateWhere.mockReset();
+    mockUpdateSet.mockReset();
     mockSelectWhere.mockReset();
     mockSelectFrom.mockReset();
     mockSelectOrderBy.mockReset();
@@ -66,6 +74,8 @@ describe('listVisibleNotes / deleteVisibleNote', () => {
     mockSelectFrom.mockReturnValue({ where: mockSelectWhere });
     mockSelectLimit.mockResolvedValue([{ id: 1, createdBy: 2 }]);
     mockDeleteWhere.mockResolvedValue(undefined);
+    mockUpdateSet.mockReturnValue({ where: mockUpdateWhere });
+    mockUpdateWhere.mockResolvedValue(undefined);
   });
 
   it('lists notes with family + visibility filters and clamped limit', async () => {
@@ -76,6 +86,7 @@ describe('listVisibleNotes / deleteVisibleNote', () => {
         content: 'Drawer',
         category: 'document',
         privacyLevel: 'public',
+        hiddenFrom: null,
         createdBy: 2,
         createdAt: new Date('2026-09-01T00:00:00Z'),
       },
@@ -90,6 +101,7 @@ describe('listVisibleNotes / deleteVisibleNote', () => {
     });
 
     expect(rows).toHaveLength(1);
+    expect(rows[0]?.hiddenFrom).toBeNull();
     expect(mockSelectChainLimit).toHaveBeenCalledWith(100);
   });
 
@@ -146,5 +158,56 @@ describe('listVisibleNotes / deleteVisibleNote', () => {
         noteId: 5,
       }),
     ).resolves.toEqual({ ok: true });
+  });
+
+  it('updateVisibleNotePrivacy forbids children editing others notes', async () => {
+    mockSelectLimit.mockResolvedValue([{ id: 5, createdBy: 1 }]);
+    const { updateVisibleNotePrivacy } = await import('./list-notes');
+    await expect(
+      updateVisibleNotePrivacy({
+        familyId: 9,
+        userId: 4,
+        familyRole: 'child',
+        noteId: 5,
+        privacyLevel: 'adults_only',
+        hiddenFrom: [1],
+      }),
+    ).resolves.toEqual({ ok: false, error: 'forbidden' });
+    expect(mockUpdateSet).not.toHaveBeenCalled();
+  });
+
+  it('updateVisibleNotePrivacy saves hide-from and clears it for personal', async () => {
+    mockSelectLimit.mockResolvedValue([{ id: 5, createdBy: 2 }]);
+    const { updateVisibleNotePrivacy } = await import('./list-notes');
+    await expect(
+      updateVisibleNotePrivacy({
+        familyId: 9,
+        userId: 2,
+        familyRole: 'adult',
+        noteId: 5,
+        privacyLevel: 'public',
+        hiddenFrom: [3, 3, 2],
+      }),
+    ).resolves.toEqual({ ok: true });
+    expect(mockUpdateSet).toHaveBeenCalledWith({
+      privacyLevel: 'public',
+      hiddenFrom: [3],
+    });
+
+    mockUpdateSet.mockClear();
+    await expect(
+      updateVisibleNotePrivacy({
+        familyId: 9,
+        userId: 2,
+        familyRole: 'adult',
+        noteId: 5,
+        privacyLevel: 'personal',
+        hiddenFrom: [3],
+      }),
+    ).resolves.toEqual({ ok: true });
+    expect(mockUpdateSet).toHaveBeenCalledWith({
+      privacyLevel: 'personal',
+      hiddenFrom: null,
+    });
   });
 });

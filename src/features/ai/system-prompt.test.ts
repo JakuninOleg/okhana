@@ -75,6 +75,15 @@ describe('buildSystemPrompt task vs fact routing', () => {
     expect(prompt).toMatch(/Russian Federation|United States|European Union/i);
     expect(prompt).toContain('CHILD SAFETY');
   });
+
+  it('requires kinship words to map to member ids for tasks', () => {
+    const prompt = buildSystemPrompt(base);
+    expect(prompt).toContain('KINSHIP RESOLUTION');
+    expect(prompt).toMatch(/мама\/маме/);
+    expect(prompt).toMatch(/kinship "mom"/);
+    expect(prompt).toContain('Never invent member ids');
+    expect(prompt).toContain('only ever see what this user is allowed to see');
+  });
 });
 
 describe('task tool descriptions reinforce fact vs task split', () => {
