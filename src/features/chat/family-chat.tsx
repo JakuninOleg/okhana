@@ -86,6 +86,7 @@ const SUGGESTION_KEYS = [
   'suggestionCreateTask',
   'suggestionMyTasks',
   'suggestionRememberNote',
+  'suggestionMemorableDate',
 ] as const;
 
 export function FamilyChat(): React.JSX.Element {
@@ -374,12 +375,12 @@ export function FamilyChat(): React.JSX.Element {
       <Card
         id="family-chat"
         className={cn(
-          'flex w-full flex-1 flex-col gap-0 border-border/60 bg-card/90 py-0 shadow-sm backdrop-blur-sm',
-          // Bounded window: message list scrolls inside; desktop fills remaining hub height.
-          'min-h-[20rem] max-h-[min(70dvh,36rem)] overflow-hidden lg:max-h-none lg:min-h-0',
+          'flex w-full flex-1 flex-col gap-0 border-border/70 bg-card/90 py-0 shadow-sm backdrop-blur-sm dark:border-border dark:bg-card',
+          // Mobile: taller viewport so the thread is usable; desktop fills remaining hub height.
+          'min-h-[28rem] max-h-[min(85dvh,52rem)] overflow-hidden lg:max-h-none lg:min-h-0',
         )}
       >
-        <CardHeader className="shrink-0 gap-3 border-b border-border/60 px-4 py-3 sm:px-5 sm:py-4">
+        <CardHeader className="shrink-0 gap-3 border-b border-border/70 px-4 py-3 dark:border-border sm:px-5 sm:py-4">
           <div className="flex items-start gap-3">
             <OkhanaAvatar size="lg" label={t('assistantName')} />
             <div className="min-w-0 flex-1 space-y-2">
@@ -497,7 +498,7 @@ export function FamilyChat(): React.JSX.Element {
           </p>
         ) : null}
 
-        <CardFooter className="shrink-0 flex-col items-stretch gap-2 border-border/60 bg-muted/20 px-3 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] dark:bg-muted/10">
+        <CardFooter className="shrink-0 flex-col items-stretch gap-2 border-border/70 bg-muted/30 px-3 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] dark:border-border dark:bg-muted/50">
           {messages.length > 0 ? (
             <div className="flex flex-wrap gap-2 px-0.5">
               {SUGGESTION_KEYS.map((key) => (
@@ -520,7 +521,7 @@ export function FamilyChat(): React.JSX.Element {
           <div
             className={cn(
               'flex items-end gap-2 rounded-2xl border border-border/70 bg-background/90 p-2 shadow-sm',
-              'dark:bg-background/80',
+              'dark:border-border dark:bg-background',
               recording && 'border-destructive/40 ring-2 ring-destructive/15',
             )}
           >

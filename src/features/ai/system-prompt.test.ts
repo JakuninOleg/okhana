@@ -39,12 +39,23 @@ describe('buildSystemPrompt task vs fact routing', () => {
 
   it('steers facts to remember_note and actions to create_task', () => {
     const prompt = buildSystemPrompt(base);
-    expect(prompt).toContain('Separate facts from tasks');
-    expect(prompt).toContain('passport in the living-room cabinet');
+    expect(prompt).toContain('three different things');
+    expect(prompt).toContain('NOTES (заметки)');
+    expect(prompt).toContain('TASKS / ПОРУЧЕНИЯ');
+    expect(prompt).toContain('passport is in the living-room cabinet');
     expect(prompt).toContain('запомни купи молоко');
     expect(prompt).toContain('remember_note');
     expect(prompt).toContain('create_task');
     expect(prompt).toContain('default to assigning the current user');
+  });
+
+  it('routes anniversaries to create_memorable_date not notes', () => {
+    const prompt = buildSystemPrompt(base);
+    expect(prompt).toContain('MEMORABLE DATES');
+    expect(prompt).toContain('create_memorable_date');
+    expect(prompt).toContain('годовщина');
+    expect(prompt).toMatch(/NEVER use remember_note/i);
+    expect(prompt).toContain('памятная дата / заметка / поручение');
   });
 
   it('mentions missing clientNow when not provided', () => {
@@ -54,6 +65,15 @@ describe('buildSystemPrompt task vs fact routing', () => {
       timeZone: null,
     });
     expect(prompt).toContain('User device local datetime was not provided');
+  });
+
+  it('limits scope to family assistance and refuses politics and illegal topics', () => {
+    const prompt = buildSystemPrompt(base);
+    expect(prompt).toContain('exclusively a family home assistant');
+    expect(prompt).toContain('REFUSALS');
+    expect(prompt).toMatch(/politics|elections|ideology/i);
+    expect(prompt).toMatch(/Russian Federation|United States|European Union/i);
+    expect(prompt).toContain('CHILD SAFETY');
   });
 });
 
@@ -65,7 +85,9 @@ describe('task tool descriptions reinforce fact vs task split', () => {
 
     expect(tools.remember_note).toMatch(/FACT/i);
     expect(tools.remember_note).toMatch(/create_task/);
+    expect(tools.remember_note).toMatch(/create_memorable_date/);
     expect(tools.create_task).toMatch(/поручение|task|reminder/i);
     expect(tools.create_task).toMatch(/запомни купи|buy milk|remember_note/i);
+    expect(tools.create_memorable_date).toMatch(/anniversary|годовщина|birthday/i);
   });
 });

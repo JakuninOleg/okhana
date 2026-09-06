@@ -20,16 +20,14 @@ import {
   type TaskActionErrorCode,
 } from '@/features/tasks/task-actions';
 import type { VisibleTask } from '@/features/tasks/list-tasks';
+import { formatDateTimeMedium } from '@/lib/format-date';
 import { cn } from '@/lib/utils';
 
 function formatDue(iso: string | null, locale: string): string | null {
   if (!iso) return null;
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return null;
-  return new Intl.DateTimeFormat(locale, {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(date);
+  return formatDateTimeMedium(date, locale);
 }
 
 function TaskRow({

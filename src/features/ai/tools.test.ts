@@ -12,6 +12,9 @@ const mockNotifyAcknowledged = vi.hoisted(() => vi.fn());
 const mockNotifyCompleted = vi.hoisted(() => vi.fn());
 const mockCreateFamilyEvent = vi.hoisted(() => vi.fn());
 const mockListEventsInRange = vi.hoisted(() => vi.fn());
+const mockCreateFamilyDate = vi.hoisted(() => vi.fn());
+const mockListFamilyDates = vi.hoisted(() => vi.fn());
+const mockListMemberBirthdays = vi.hoisted(() => vi.fn());
 
 vi.mock('@/features/notes/save-note', () => ({
   saveNote: (...args: unknown[]) => mockSaveNote(...args),
@@ -26,6 +29,18 @@ vi.mock('@/features/calendar/list-events', () => ({
   listEventsInRange: (...args: unknown[]) => mockListEventsInRange(...args),
 }));
 
+vi.mock('@/features/family/create-family-date', () => ({
+  createFamilyDate: (...args: unknown[]) => mockCreateFamilyDate(...args),
+}));
+
+vi.mock('@/features/family/list-family-dates', () => ({
+  listFamilyDates: (...args: unknown[]) => mockListFamilyDates(...args),
+}));
+
+vi.mock('@/features/family/list-member-birthdays', () => ({
+  listMemberBirthdays: (...args: unknown[]) => mockListMemberBirthdays(...args),
+}));
+
 vi.mock('@/features/tasks/create-task', () => ({
   createFamilyTask: (...args: unknown[]) => mockCreateFamilyTask(...args),
 }));
@@ -34,6 +49,12 @@ vi.mock('@/features/notifications/task-notifications', () => ({
   notifyTaskAssigned: (...args: unknown[]) => mockNotifyAssigned(...args),
   notifyTaskAcknowledged: (...args: unknown[]) => mockNotifyAcknowledged(...args),
   notifyTaskCompleted: (...args: unknown[]) => mockNotifyCompleted(...args),
+}));
+
+vi.mock('@/features/notifications/family-activity-notifications', () => ({
+  notifyEventCreated: vi.fn().mockResolvedValue(undefined),
+  notifyMemorableDateCreated: vi.fn().mockResolvedValue(undefined),
+  notifyNoteCreated: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('@/features/tasks/list-tasks', () => ({
@@ -57,6 +78,9 @@ describe('AI tools', () => {
     mockNotifyCompleted.mockReset();
     mockCreateFamilyEvent.mockReset();
     mockListEventsInRange.mockReset();
+    mockCreateFamilyDate.mockReset();
+    mockListFamilyDates.mockReset();
+    mockListMemberBirthdays.mockReset();
   });
 
   it('exposes OpenAI-compatible tool definitions for Go-Ai', () => {
@@ -65,8 +89,10 @@ describe('AI tools', () => {
       'acknowledge_task',
       'complete_task',
       'create_event',
+      'create_memorable_date',
       'create_task',
       'list_events',
+      'list_memorable_dates',
       'list_tasks',
       'remember_note',
       'search_notes',
@@ -348,5 +374,138 @@ describe('AI tools', () => {
         '{}',
       ),
     ).resolves.toEqual({ error: 'Unknown tool: delete_everything' });
+  });
+
+  it('creates a memorable date via create_memorable_date', async () => {
+    mockCreateFamilyDate.mockResolvedValue({
+      id: 9,
+      title: 'Годовщина свадьбы',
+      kind: 'anniversary',
+      month: 6,
+      day: 21,
+      year: 2023,
+    });
+
+    await expect(
+      executeAiTool(
+        { familyId: 1, userId: 2, familyRole: 'owner' },
+        'create_memorable_date',
+        JSON.stringify({
+          title: 'Годовщина свадьбы',
+          kind: 'anniversary',
+          month: 6,
+          day: 21,
+          year: 2023,
+        }),
+      ),
+    ).resolves.toEqual({
+      saved: true,
+      id: 9,
+      title: 'Годовщина свадьбы',
+      kind: 'anniversary',
+      month: 6,
+      day: 21,
+      year: 2023,
+    });
+
+    expect(mockCreateFamilyDate).toHaveBeenCalledWith({
+      familyId: 1,
+      createdBy: 2,
+      title: 'Годовщина свадьбы',
+      kind: 'anniversary',
+      month: 6,
+      day: 21,
+      year: 2023,
+      notes: null,
+    });
+  });
+
+  it('rejects create_memorable_date for children', async () => {
+    await expect(
+      executeAiTool(
+        { familyId: 1, userId: 4, familyRole: 'child' },
+        'create_memorable_date',
+        JSON.stringify({
+          title: 'День рождения',
+          kind: 'birthday',
+          month: 3,
+          day: 5,
+        }),
+      ),
+    ).resolves.toEqual({ error: 'Children cannot create memorable dates' });
+    expect(mockCreateFamilyDate).not.toHaveBeenCalled();
+  });
+
+  it('lists events using clientNow day boundary', async () => {
+    mockListEventsInRange.mockResolvedValue([{ id: 1, title: 'Trip' }]);
+
+    await expect(
+      executeAiTool(
+        {
+          familyId: 1,
+          userId: 2,
+          familyRole: 'adult',
+          clientNow: '2026-09-06T01:30:00+03:00',
+        },
+        'list_events',
+        JSON.stringify({ daysAhead: 30 }),
+      ),
+    ).resolves.toEqual({ events: [{ id: 1, title: 'Trip' }] });
+
+    expect(mockListEventsInRange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        familyId: 1,
+        from: new Date('2026-09-05T21:00:00.000Z'),
+        to: new Date('2026-10-05T21:00:00.000Z'),
+      }),
+    );
+  });
+
+  it('lists memorable dates together with profile member birthdays', async () => {
+    mockListFamilyDates.mockResolvedValue([
+      { id: 1, title: 'Anniversary', kind: 'anniversary', month: 6, day: 21 },
+    ]);
+    mockListMemberBirthdays.mockResolvedValue([
+      {
+        userId: 3,
+        displayName: 'Саша',
+        month: 3,
+        day: 5,
+        year: 2015,
+        nextOccurrence: '2027-03-05',
+      },
+    ]);
+
+    await expect(
+      executeAiTool(
+        {
+          familyId: 1,
+          userId: 2,
+          familyRole: 'adult',
+          clientNow: '2026-09-06T12:00:00+03:00',
+        },
+        'list_memorable_dates',
+        '{}',
+      ),
+    ).resolves.toEqual({
+      dates: [{ id: 1, title: 'Anniversary', kind: 'anniversary', month: 6, day: 21 }],
+      memberBirthdays: [
+        {
+          userId: 3,
+          displayName: 'Саша',
+          month: 3,
+          day: 5,
+          year: 2015,
+          nextOccurrence: '2027-03-05',
+        },
+      ],
+    });
+
+    expect(mockListFamilyDates).toHaveBeenCalledWith(1, {
+      today: { year: 2026, month: 9, day: 6 },
+    });
+    expect(mockListMemberBirthdays).toHaveBeenCalledWith(1, {
+      today: { year: 2026, month: 9, day: 6 },
+    });
   });
 });

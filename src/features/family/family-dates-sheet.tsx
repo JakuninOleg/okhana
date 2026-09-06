@@ -19,18 +19,17 @@ import {
   deleteFamilyDateAction,
   loadFamilyDatesAction,
   type FamilyDateActionError,
+  type MemberBirthdayRecord,
 } from '@/features/family/date-actions';
+import { formatClientNowIso } from '@/features/calendar/calendar-time';
 import {
   FAMILY_DATE_KINDS,
   type FamilyDateKind,
   type FamilyDateRecord,
 } from '@/features/family/family-date-utils';
+import { HubToolbarIcon, HubToolbarLabel, hubToolbarTriggerClassName } from '@/features/family/hub-toolbar';
+import { formatMonthDay, formatIsoYmd } from '@/lib/format-date';
 import { cn } from '@/lib/utils';
-
-function formatMonthDay(month: number, day: number, locale: string): string {
-  const date = new Date(2024, month - 1, day);
-  return new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'long' }).format(date);
-}
 
 function DateRow({
   item,
@@ -56,7 +55,7 @@ function DateRow({
               t(`kind.${item.kind}`),
               formatMonthDay(item.month, item.day, locale),
               item.year ? t('sinceYear', { year: item.year }) : null,
-              t('nextOn', { date: item.nextOccurrence }),
+              t('nextOn', { date: formatIsoYmd(item.nextOccurrence, locale) }),
             ]
               .filter(Boolean)
               .join(' · ')}
@@ -82,10 +81,41 @@ function DateRow({
   );
 }
 
+function BirthdayRow({ item }: { item: MemberBirthdayRecord }): React.JSX.Element {
+  const t = useTranslations('Dashboard.familyDates');
+  const locale = useLocale();
+
+  return (
+    <li className="rounded-2xl border border-border/60 bg-background/70 px-3 py-3">
+      <div className="min-w-0 space-y-1">
+        <p className="text-sm font-medium text-foreground">
+          {t('memberBirthday', { name: item.displayName })}
+        </p>
+        <p className="text-xs text-muted-foreground">
+          {[
+            t('kind.birthday'),
+            formatMonthDay(item.month, item.day, locale),
+            item.year ? t('sinceYear', { year: item.year }) : null,
+            t('nextOn', { date: formatIsoYmd(item.nextOccurrence, locale) }),
+            t('fromProfile'),
+          ]
+            .filter(Boolean)
+            .join(' · ')}
+        </p>
+      </div>
+    </li>
+  );
+}
+
+type DatesListItem =
+  | { type: 'stored'; sortKey: string; item: FamilyDateRecord }
+  | { type: 'birthday'; sortKey: string; item: MemberBirthdayRecord };
+
 export function FamilyDatesSheet(): React.JSX.Element {
   const t = useTranslations('Dashboard.familyDates');
   const [open, setOpen] = useState(false);
   const [dates, setDates] = useState<FamilyDateRecord[]>([]);
+  const [memberBirthdays, setMemberBirthdays] = useState<MemberBirthdayRecord[]>([]);
   const [canManage, setCanManage] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -101,15 +131,31 @@ export function FamilyDatesSheet(): React.JSX.Element {
   const refresh = useCallback(async (): Promise<void> => {
     setLoading(true);
     setError(null);
-    const result = await loadFamilyDatesAction();
+    const result = await loadFamilyDatesAction({
+      clientNow: formatClientNowIso(),
+    });
     setLoading(false);
     if (!result.ok) {
       setError(t(`errors.${result.error}` as `errors.${FamilyDateActionError}`));
       return;
     }
     setDates(result.dates);
+    setMemberBirthdays(result.memberBirthdays);
     setCanManage(result.canManage);
   }, [t]);
+
+  const listItems: DatesListItem[] = [
+    ...dates.map((item) => ({
+      type: 'stored' as const,
+      sortKey: item.nextOccurrence,
+      item,
+    })),
+    ...memberBirthdays.map((item) => ({
+      type: 'birthday' as const,
+      sortKey: item.nextOccurrence,
+      item,
+    })),
+  ].sort((a, b) => a.sortKey.localeCompare(b.sortKey));
 
   function mapError(code: FamilyDateActionError): string {
     return t(`errors.${code}`);
@@ -128,18 +174,11 @@ export function FamilyDatesSheet(): React.JSX.Element {
         }
       }}
     >
-      <SheetTrigger
-        render={
-          <Button
-            type="button"
-            size="icon"
-            variant="ghost"
-            aria-label={t('open')}
-            className="shrink-0"
-          />
-        }
-      >
-        <CalendarHeart className="size-4" />
+      <SheetTrigger className={hubToolbarTriggerClassName()} aria-label={t('open')}>
+        <HubToolbarIcon>
+          <CalendarHeart />
+        </HubToolbarIcon>
+        <HubToolbarLabel>{t('shortLabel')}</HubToolbarLabel>
       </SheetTrigger>
       <SheetContent side="center" className="flex flex-col gap-0 overflow-hidden">
         <SheetHeader className="border-b border-border/60">
@@ -285,29 +324,33 @@ export function FamilyDatesSheet(): React.JSX.Element {
               <Loader2 className="size-4 animate-spin" />
               {t('loading')}
             </div>
-          ) : dates.length === 0 ? (
+          ) : listItems.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">{t('empty')}</p>
           ) : (
             <ul className="space-y-2">
-              {dates.map((item) => (
-                <DateRow
-                  key={item.id}
-                  item={item}
-                  canManage={canManage}
-                  pending={pending}
-                  onDelete={(id) => {
-                    startTransition(async () => {
-                      setError(null);
-                      const result = await deleteFamilyDateAction(id);
-                      if (!result.ok) {
-                        setError(mapError(result.error));
-                        return;
-                      }
-                      await refresh();
-                    });
-                  }}
-                />
-              ))}
+              {listItems.map((entry) =>
+                entry.type === 'birthday' ? (
+                  <BirthdayRow key={`birthday-${entry.item.userId}`} item={entry.item} />
+                ) : (
+                  <DateRow
+                    key={entry.item.id}
+                    item={entry.item}
+                    canManage={canManage}
+                    pending={pending}
+                    onDelete={(id) => {
+                      startTransition(async () => {
+                        setError(null);
+                        const result = await deleteFamilyDateAction(id);
+                        if (!result.ok) {
+                          setError(mapError(result.error));
+                          return;
+                        }
+                        await refresh();
+                      });
+                    }}
+                  />
+                ),
+              )}
             </ul>
           )}
         </div>

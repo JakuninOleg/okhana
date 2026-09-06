@@ -249,7 +249,12 @@ describe('POST /api/chat', () => {
         ]
       >
     )[0]?.[0];
-    expect(arg.toolContext).toEqual({ familyId: 3, userId: 9, familyRole: 'owner' });
+    expect(arg.toolContext).toEqual({
+      familyId: 3,
+      userId: 9,
+      familyRole: 'owner',
+      clientNow: null,
+    });
     expect(arg.messages[0]?.role).toBe('system');
     expect(arg.messages.some((message) => message.role === 'user')).toBe(true);
   });

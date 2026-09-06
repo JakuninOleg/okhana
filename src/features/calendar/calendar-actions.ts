@@ -9,8 +9,18 @@ import {
   listEventsInRange,
   type FamilyEventRecord,
 } from '@/features/calendar/list-events';
+import {
+  buildMonthVisibleRange,
+  calendarYmdFromClientNow,
+  parseAbsoluteDateTime,
+} from '@/features/calendar/calendar-time';
 import { listFamilyDates } from '@/features/family/list-family-dates';
+import {
+  listMemberBirthdays,
+  type MemberBirthdayRecord,
+} from '@/features/family/list-member-birthdays';
 import type { FamilyDateRecord } from '@/features/family/family-date-utils';
+import { notifyEventCreated } from '@/features/notifications/family-activity-notifications';
 import { ensureDbUser } from '@/lib/server/users/ensure-db-user';
 
 export type CalendarActionError =
@@ -36,12 +46,44 @@ function canManage(role: string): boolean {
   return role === 'owner' || role === 'adult';
 }
 
-export async function loadFamilyCalendarAction(): Promise<
+function resolveMonth(input?: {
+  clientNow?: string;
+  year?: number;
+  month?: number;
+}): { year: number; month: number } {
+  if (
+    typeof input?.year === 'number'
+    && typeof input?.month === 'number'
+    && Number.isInteger(input.year)
+    && input.month >= 1
+    && input.month <= 12
+  ) {
+    return { year: input.year, month: input.month };
+  }
+  const fromClient = calendarYmdFromClientNow(input?.clientNow ?? null);
+  if (fromClient) {
+    return { year: fromClient.year, month: fromClient.month };
+  }
+  const now = new Date();
+  return { year: now.getFullYear(), month: now.getMonth() + 1 };
+}
+
+export async function loadFamilyCalendarAction(input?: {
+  /** Device-local ISO with offset — anchors “today” + month TZ. */
+  clientNow?: string;
+  /** Calendar year for the visible month grid. */
+  year?: number;
+  /** Calendar month 1–12 for the visible month grid. */
+  month?: number;
+}): Promise<
   {
     ok: true;
     events: FamilyEventRecord[];
     dates: FamilyDateRecord[];
+    memberBirthdays: MemberBirthdayRecord[];
     canManage: boolean;
+    year: number;
+    month: number;
   }
   | { ok: false; error: CalendarActionError }
 > {
@@ -56,21 +98,29 @@ export async function loadFamilyCalendarAction(): Promise<
       return { ok: false, error: 'forbidden' };
     }
 
-    const from = new Date();
-    from.setHours(0, 0, 0, 0);
-    const to = new Date(from);
-    to.setDate(to.getDate() + 90);
+    const { year, month } = resolveMonth(input);
+    const { from, to } = buildMonthVisibleRange({
+      year,
+      month,
+      padDays: 7,
+      clientNowIso: input?.clientNow ?? null,
+    });
+    const today = calendarYmdFromClientNow(input?.clientNow ?? null) ?? undefined;
 
-    const [eventRows, dates] = await Promise.all([
-      listEventsInRange({ familyId: actor.familyId, from, to }),
-      listFamilyDates(actor.familyId),
+    const [eventRows, dates, memberBirthdays] = await Promise.all([
+      listEventsInRange({ familyId: actor.familyId, from, to, limit: 100 }),
+      listFamilyDates(actor.familyId, today ? { today } : undefined),
+      listMemberBirthdays(actor.familyId, today ? { today } : undefined),
     ]);
 
     return {
       ok: true,
       events: eventRows,
       dates,
+      memberBirthdays,
       canManage: canManage(actor.familyRole),
+      year,
+      month,
     };
   } catch {
     return { ok: false, error: 'db_unavailable' };
@@ -87,8 +137,7 @@ const createSchema = z.object({
 });
 
 function parseClientDate(value: string): Date | null {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date;
+  return parseAbsoluteDateTime(value);
 }
 
 export async function createCalendarEventAction(
@@ -131,6 +180,13 @@ export async function createCalendarEventAction(
       startTime,
       endTime,
       allDay: parsed.data.allDay ?? false,
+    });
+
+    void notifyEventCreated({
+      familyId: actor.familyId,
+      createdBy: actor.userId,
+      eventId: created.id,
+      eventTitle: parsed.data.title,
     });
 
     revalidatePath('/[locale]/dashboard', 'page');

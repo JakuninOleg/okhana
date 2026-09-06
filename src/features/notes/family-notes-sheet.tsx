@@ -13,18 +13,17 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet';
 import { requestFamilyChatSend } from '@/features/chat/family-chat-store';
+import { HubToolbarIcon, HubToolbarLabel, hubToolbarTriggerClassName } from '@/features/family/hub-toolbar';
 import {
   deleteNoteAction,
   loadVisibleNotesAction,
   type NoteActionError,
 } from '@/features/notes/note-actions';
 import type { VisibleNote } from '@/features/notes/list-notes';
+import { formatDateTimeMedium } from '@/lib/format-date';
 
 function formatCreatedAt(value: Date, locale: string): string {
-  return new Intl.DateTimeFormat(locale, {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(value instanceof Date ? value : new Date(value));
+  return formatDateTimeMedium(value, locale);
 }
 
 function NoteRow({
@@ -120,18 +119,11 @@ export function FamilyNotesSheet(): React.JSX.Element {
         }
       }}
     >
-      <SheetTrigger
-        render={
-          <Button
-            type="button"
-            size="icon"
-            variant="ghost"
-            aria-label={t('open')}
-            className="shrink-0"
-          />
-        }
-      >
-        <StickyNote className="size-4" />
+      <SheetTrigger className={hubToolbarTriggerClassName()} aria-label={t('open')}>
+        <HubToolbarIcon>
+          <StickyNote />
+        </HubToolbarIcon>
+        <HubToolbarLabel>{t('shortLabel')}</HubToolbarLabel>
       </SheetTrigger>
       <SheetContent side="center" className="flex flex-col gap-0 overflow-hidden">
         <SheetHeader className="border-b border-border/60">
@@ -165,7 +157,7 @@ export function FamilyNotesSheet(): React.JSX.Element {
               {error}
             </p>
           ) : notes.length === 0 ? (
-            <div className="space-y-2 py-8 text-center">
+            <div className="space-y-3 rounded-2xl border border-dashed border-border/70 bg-brand-sun/20 px-3 py-8 text-center dark:bg-brand-peach/10">
               <p className="text-sm text-muted-foreground">{t('empty')}</p>
               <p className="text-xs text-muted-foreground">{t('createHint')}</p>
             </div>

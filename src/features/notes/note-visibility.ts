@@ -3,6 +3,32 @@ import { notes } from '@/lib/server/db/schema';
 
 export type FamilyRole = 'owner' | 'adult' | 'child';
 
+export type NoteVisibilitySnapshot = {
+  privacyLevel: 'public' | 'adults_only' | 'personal';
+  createdBy: number | null;
+  hiddenFrom: number[] | null;
+};
+
+/**
+ * Pure ACL mirror of `noteVisibilityConditions` — keep in sync with the SQL below.
+ * Used in unit tests so privacy rules stay explicit without hitting the database.
+ */
+export function noteIsVisibleToViewer(
+  note: NoteVisibilitySnapshot,
+  viewer: { userId: number; familyRole: FamilyRole },
+): boolean {
+  if (viewer.familyRole === 'child' && note.privacyLevel === 'adults_only') {
+    return false;
+  }
+  if (note.privacyLevel === 'personal' && note.createdBy !== viewer.userId) {
+    return false;
+  }
+  if (note.hiddenFrom?.includes(viewer.userId)) {
+    return false;
+  }
+  return true;
+}
+
 /**
  * DB-level note visibility for the asking user.
  * Never rely on the model to withhold notes — filter here before any AI context.
