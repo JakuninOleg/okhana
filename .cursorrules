@@ -64,6 +64,7 @@ Okhana is an AI-powered family hub. The core principle: **"AI is the architectur
 ## Before Submitting
 
 - [ ] `npx eslint` on **touched** `.ts`/`.tsx` — zero **errors** (required even after green test/build)
+- [ ] **Code review** — Bugbot for feature/fix work; Security Review if auth/push/cron/ACL/webhooks; fix high/medium before push
 - [ ] `npm run build` — zero TypeScript errors
 - [ ] `npm run test` — all tests green
 - [ ] `npm run lint` — no new errors before PR (full run when practical)
