@@ -13,6 +13,8 @@ import { FamilyMemberAvatar } from '@/features/family/family-member-avatar';
 import { FamilyDatesSheet } from '@/features/family/family-dates-sheet';
 import { InviteCodeDisplay } from '@/features/family/invite-code-display';
 import { MemberProfileSheet } from '@/features/family/member-profile-sheet';
+import { FamilyCalendarSheet } from '@/features/calendar/family-calendar-sheet';
+import { FamilyNotesSheet } from '@/features/notes/family-notes-sheet';
 import { PushNotificationsSettings } from '@/features/notifications/push-notifications-settings';
 import { Button } from '@/components/ui/button';
 import {
@@ -192,6 +194,8 @@ export function FamilyHubMenu({
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-1">
+            <FamilyNotesSheet />
+            <FamilyCalendarSheet />
             <FamilyDatesSheet />
             <FamilySettingsSheet familyName={familyName} inviteCode={inviteCode} />
           </div>
@@ -225,6 +229,8 @@ export function FamilyHubMenu({
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-1">
+              <FamilyNotesSheet />
+              <FamilyCalendarSheet />
               <FamilyDatesSheet />
               <FamilySettingsSheet familyName={familyName} inviteCode={inviteCode} />
             </div>

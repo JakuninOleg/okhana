@@ -1,0 +1,120 @@
+import { and, asc, eq, gte, lte } from 'drizzle-orm';
+import { db } from '@/lib/server/db';
+import { withDbRetry } from '@/lib/server/db/client';
+import { events } from '@/lib/server/db/schema';
+
+export type FamilyEventRecord = {
+  id: number;
+  title: string;
+  description: string | null;
+  startTime: Date;
+  endTime: Date | null;
+  allDay: boolean;
+  createdBy: number | null;
+};
+
+type ListEventsInRangeInput = {
+  familyId: number;
+  from: Date;
+  to: Date;
+  limit?: number;
+};
+
+export async function listEventsInRange(
+  input: ListEventsInRangeInput,
+): Promise<FamilyEventRecord[]> {
+  const maxResults = Math.min(Math.max(input.limit ?? 50, 1), 100);
+
+  return withDbRetry(async () => db
+    .select({
+      id: events.id,
+      title: events.title,
+      description: events.description,
+      startTime: events.startTime,
+      endTime: events.endTime,
+      allDay: events.allDay,
+      createdBy: events.createdBy,
+    })
+    .from(events)
+    .where(
+      and(
+        eq(events.familyId, input.familyId),
+        gte(events.startTime, input.from),
+        lte(events.startTime, input.to),
+      ),
+    )
+    .orderBy(asc(events.startTime))
+    .limit(maxResults));
+}
+
+type CreateEventInput = {
+  familyId: number;
+  createdBy: number;
+  title: string;
+  description?: string;
+  startTime: Date;
+  endTime?: Date | null;
+  allDay?: boolean;
+};
+
+export async function createFamilyEvent(
+  input: CreateEventInput,
+): Promise<{ id: number }> {
+  return withDbRetry(async () => {
+    const [row] = await db
+      .insert(events)
+      .values({
+        familyId: input.familyId,
+        createdBy: input.createdBy,
+        title: input.title,
+        description: input.description?.trim() || null,
+        startTime: input.startTime,
+        endTime: input.endTime ?? null,
+        allDay: input.allDay ?? false,
+      })
+      .returning({ id: events.id });
+
+    if (!row) {
+      throw new Error('Failed to create event');
+    }
+    return { id: row.id };
+  });
+}
+
+type DeleteEventInput = {
+  familyId: number;
+  userId: number;
+  familyRole: 'owner' | 'adult' | 'child';
+  eventId: number;
+};
+
+export async function deleteFamilyEvent(
+  input: DeleteEventInput,
+): Promise<{ ok: true } | { ok: false; error: 'not_found' | 'forbidden' }> {
+  return withDbRetry(async () => {
+    const [row] = await db
+      .select({
+        id: events.id,
+        createdBy: events.createdBy,
+      })
+      .from(events)
+      .where(and(eq(events.id, input.eventId), eq(events.familyId, input.familyId)))
+      .limit(1);
+
+    if (!row) {
+      return { ok: false, error: 'not_found' };
+    }
+
+    const isOwnerOrAdult = input.familyRole === 'owner' || input.familyRole === 'adult';
+    const isAuthor = row.createdBy === input.userId;
+    if (!isOwnerOrAdult && !isAuthor) {
+      return { ok: false, error: 'forbidden' };
+    }
+
+    await db
+      .delete(events)
+      .where(and(eq(events.id, input.eventId), eq(events.familyId, input.familyId)));
+
+    return { ok: true };
+  });
+}

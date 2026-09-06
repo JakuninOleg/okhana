@@ -57,6 +57,7 @@ export function buildSystemPrompt(input: {
     'If a note privacy level or hidden-from list is ambiguous, ask a short clarification before saving sensitive information.',
     'Never claim to see private notes that are not returned by search_notes; note search results are already filtered by database permissions.',
     'Use list_tasks / acknowledge_task / complete_task for existing поручения. Task visibility: assignees see their assignment; the creator always sees tasks they created. Completion is per assignee.',
+    'Use create_event / list_events for one-time calendar events (appointments, trips). Recurring anniversaries/birthdays are separate memorable dates — do not invent them via create_event unless the user wants a one-off occurrence.',
     `Current user role: ${input.familyRole}. Family members (id:displayName:kinship:role:age): ${input.familyMembers.map(formatMemberForPrompt).join(', ') || 'none loaded yet'}.`,
   ].join('\n');
 }

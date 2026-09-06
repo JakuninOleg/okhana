@@ -10,6 +10,8 @@ const mockComplete = vi.hoisted(() => vi.fn());
 const mockNotifyAssigned = vi.hoisted(() => vi.fn());
 const mockNotifyAcknowledged = vi.hoisted(() => vi.fn());
 const mockNotifyCompleted = vi.hoisted(() => vi.fn());
+const mockCreateFamilyEvent = vi.hoisted(() => vi.fn());
+const mockListEventsInRange = vi.hoisted(() => vi.fn());
 
 vi.mock('@/features/notes/save-note', () => ({
   saveNote: (...args: unknown[]) => mockSaveNote(...args),
@@ -17,6 +19,11 @@ vi.mock('@/features/notes/save-note', () => ({
 
 vi.mock('@/features/notes/search-notes', () => ({
   searchNotes: (...args: unknown[]) => mockSearchNotes(...args),
+}));
+
+vi.mock('@/features/calendar/list-events', () => ({
+  createFamilyEvent: (...args: unknown[]) => mockCreateFamilyEvent(...args),
+  listEventsInRange: (...args: unknown[]) => mockListEventsInRange(...args),
 }));
 
 vi.mock('@/features/tasks/create-task', () => ({
@@ -48,6 +55,8 @@ describe('AI tools', () => {
     mockComplete.mockReset();
     mockNotifyAssigned.mockReset();
     mockNotifyCompleted.mockReset();
+    mockCreateFamilyEvent.mockReset();
+    mockListEventsInRange.mockReset();
   });
 
   it('exposes OpenAI-compatible tool definitions for Go-Ai', () => {
@@ -55,7 +64,9 @@ describe('AI tools', () => {
     expect(tools.map((tool) => tool.function.name).sort()).toEqual([
       'acknowledge_task',
       'complete_task',
+      'create_event',
       'create_task',
+      'list_events',
       'list_tasks',
       'remember_note',
       'search_notes',

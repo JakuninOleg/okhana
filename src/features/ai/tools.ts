@@ -1,5 +1,9 @@
 import { z } from 'zod';
 import type { GoAiToolDefinition } from '@/features/ai/go-ai-types';
+import {
+  createFamilyEvent,
+  listEventsInRange,
+} from '@/features/calendar/list-events';
 import { saveNote } from '@/features/notes/save-note';
 import { searchNotes } from '@/features/notes/search-notes';
 import { createFamilyTask } from '@/features/tasks/create-task';
@@ -55,6 +59,18 @@ const listTasksArgsSchema = z.object({
 
 const taskIdArgsSchema = z.object({
   taskId: z.number().int().positive(),
+});
+
+const createEventArgsSchema = z.object({
+  title: z.string().min(1).max(255),
+  description: z.string().max(2000).optional(),
+  startTime: z.string().min(1),
+  endTime: z.string().min(1).optional(),
+  allDay: z.boolean().optional(),
+});
+
+const listEventsArgsSchema = z.object({
+  daysAhead: z.number().int().min(1).max(180).default(30),
 });
 
 /** OpenAI-compatible tool schemas sent to Go-Ai (execution stays in-app). */
@@ -183,6 +199,43 @@ export function getAiToolDefinitions(): GoAiToolDefinition[] {
             taskId: { type: 'integer', minimum: 1 },
           },
           required: ['taskId'],
+          additionalProperties: false,
+        },
+      },
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'create_event',
+        description:
+          'Create a one-time family calendar event (not a recurring memorable date). Adults/owner only.',
+        parameters: {
+          type: 'object',
+          properties: {
+            title: { type: 'string', minLength: 1, maxLength: 255 },
+            description: { type: 'string', maxLength: 2000 },
+            startTime: {
+              type: 'string',
+              description: 'ISO-8601 datetime (prefer user local offset).',
+            },
+            endTime: { type: 'string' },
+            allDay: { type: 'boolean', default: false },
+          },
+          required: ['title', 'startTime'],
+          additionalProperties: false,
+        },
+      },
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'list_events',
+        description: 'List upcoming family calendar events in the next N days (default 30).',
+        parameters: {
+          type: 'object',
+          properties: {
+            daysAhead: { type: 'integer', minimum: 1, maximum: 180, default: 30 },
+          },
           additionalProperties: false,
         },
       },
@@ -329,6 +382,54 @@ export async function executeAiTool(
       });
     }
     return result;
+  }
+
+  if (name === 'create_event') {
+    if (input.familyRole === 'child') {
+      return { error: 'Children cannot create calendar events' };
+    }
+    const parsed = createEventArgsSchema.safeParse(args);
+    if (!parsed.success) {
+      return { error: 'Invalid create_event arguments' };
+    }
+    const startTime = new Date(parsed.data.startTime);
+    if (Number.isNaN(startTime.getTime())) {
+      return { error: 'Invalid create_event startTime' };
+    }
+    let endTime: Date | null = null;
+    if (parsed.data.endTime) {
+      endTime = new Date(parsed.data.endTime);
+      if (Number.isNaN(endTime.getTime())) {
+        return { error: 'Invalid create_event endTime' };
+      }
+    }
+    return createFamilyEvent({
+      familyId: input.familyId,
+      createdBy: input.userId,
+      title: parsed.data.title,
+      description: parsed.data.description,
+      startTime,
+      endTime,
+      allDay: parsed.data.allDay ?? false,
+    });
+  }
+
+  if (name === 'list_events') {
+    const parsed = listEventsArgsSchema.safeParse(args);
+    if (!parsed.success) {
+      return { error: 'Invalid list_events arguments' };
+    }
+    const from = new Date();
+    from.setHours(0, 0, 0, 0);
+    const to = new Date(from);
+    to.setDate(to.getDate() + parsed.data.daysAhead);
+    return {
+      events: await listEventsInRange({
+        familyId: input.familyId,
+        from,
+        to,
+      }),
+    };
   }
 
   return { error: `Unknown tool: ${name}` };

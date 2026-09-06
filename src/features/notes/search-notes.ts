@@ -1,4 +1,5 @@
-import { and, arrayContains, desc, eq, isNull, ne, not, or, sql } from 'drizzle-orm';
+import { and, desc, eq, or, sql } from 'drizzle-orm';
+import { noteVisibilityConditions } from '@/features/notes/note-visibility';
 import { db } from '@/lib/server/db';
 import { withDbRetry } from '@/lib/server/db/client';
 import { notes } from '@/lib/server/db/schema';
@@ -52,9 +53,10 @@ export async function searchNotes(input: SearchNotesInput): Promise<SearchNoteRe
           sql`${notes.title} ILIKE ${queryPattern} ESCAPE '\\'`,
           sql`${notes.content} ILIKE ${queryPattern} ESCAPE '\\'`,
         ),
-        input.familyRole === 'child' ? ne(notes.privacyLevel, 'adults_only') : undefined,
-        or(ne(notes.privacyLevel, 'personal'), eq(notes.createdBy, input.userId)),
-        or(isNull(notes.hiddenFrom), not(arrayContains(notes.hiddenFrom, [input.userId]))),
+        ...noteVisibilityConditions({
+          userId: input.userId,
+          familyRole: input.familyRole,
+        }),
       ),
     )
     .orderBy(desc(notes.createdAt))

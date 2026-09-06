@@ -92,6 +92,60 @@
         "db_unavailable": "Database is busy. Please try again."
       }
     },
+    "notes": {
+      "open": "Family notes",
+      "title": "Notes",
+      "description": "What Okhana remembered for your family — filtered by your privacy access.",
+      "create": "Remember via chat",
+      "createViaChat": "Remember a note",
+      "createHint": "Creation goes through chat — you can set privacy there.",
+      "loading": "Loading notes…",
+      "empty": "No notes visible to you yet.",
+      "delete": "Delete note",
+      "category": {
+        "general": "General",
+        "document": "Document",
+        "medical": "Medical",
+        "finance": "Finance",
+        "reminder": "Reminder"
+      },
+      "privacy": {
+        "public": "Whole family",
+        "adults_only": "Adults only",
+        "personal": "Personal"
+      },
+      "errors": {
+        "unauthorized": "Sign in again.",
+        "forbidden": "You cannot access notes.",
+        "not_found": "Note not found.",
+        "invalid_input": "Check your input.",
+        "db_unavailable": "Database temporarily unavailable."
+      }
+    },
+    "calendar": {
+      "open": "Family calendar",
+      "title": "Calendar",
+      "description": "Upcoming events and memorable family dates for the next 90 days.",
+      "add": "Add event",
+      "cancelAdd": "Cancel",
+      "titleLabel": "Title",
+      "startLabel": "Starts",
+      "descriptionLabel": "Description",
+      "save": "Save",
+      "delete": "Delete event",
+      "loading": "Loading calendar…",
+      "upcomingEvents": "Events",
+      "recurringDates": "Memorable dates",
+      "emptyEvents": "No upcoming events yet.",
+      "emptyDates": "No memorable dates yet — add them via the heart icon.",
+      "errors": {
+        "unauthorized": "Sign in again.",
+        "forbidden": "You cannot change the calendar.",
+        "invalid_input": "Check the title and date.",
+        "not_found": "Event not found.",
+        "db_unavailable": "Database temporarily unavailable."
+      }
+    },
     "familyDates": {
       "open": "Family dates",
       "title": "Memorable dates",
