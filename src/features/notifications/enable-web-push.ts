@@ -8,7 +8,12 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   for (let i = 0; i < raw.length; i += 1) {
     output[i] = raw.charCodeAt(i);
   }
-  return output;
+  // Detach into a clean ArrayBuffer — some Chromium builds reject shared/pooled buffers.
+  return new Uint8Array(output);
+}
+
+function applicationServerKeyBuffer(key: Uint8Array): BufferSource {
+  return key.buffer.slice(key.byteOffset, key.byteOffset + key.byteLength);
 }
 
 export type EnableWebPushResult =
@@ -20,23 +25,33 @@ export type EnableWebPushResult =
   | 'already'
   | 'error';
 
+async function syncSubscription(subscription: PushSubscription): Promise<boolean> {
+  const response = await fetch('/api/push/subscribe', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(subscription.toJSON()),
+  });
+  return response.ok;
+}
+
 async function subscribePush(
   registration: ServiceWorkerRegistration,
   applicationServerKey: Uint8Array,
 ): Promise<PushSubscription> {
+  const key = applicationServerKeyBuffer(applicationServerKey);
   try {
     return await registration.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: applicationServerKey as BufferSource,
+      applicationServerKey: key,
     });
   } catch (firstError) {
-    // Stale FCM registration / key rotation — drop and retry once.
+    // Already subscribed / stale FCM registration — drop and retry once.
     const stale = await registration.pushManager.getSubscription();
     await stale?.unsubscribe().catch(() => undefined);
     try {
       return await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: applicationServerKey as BufferSource,
+        applicationServerKey: key,
       });
     } catch {
       throw firstError;
@@ -83,17 +98,17 @@ export async function enableWebPush(options?: {
     await navigator.serviceWorker.ready;
 
     const existing = await registration.pushManager.getSubscription();
-    if (existing && !options?.forcePrompt) {
-      const sync = await fetch('/api/push/subscribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(existing.toJSON()),
-      });
-      return sync.ok ? 'already' : 'error';
+    if (existing) {
+      // Never call subscribe() again while a subscription exists — Chromium throws
+      // AbortError: "Registration failed - push service error".
+      const synced = await syncSubscription(existing);
+      if (!options?.forcePrompt) {
+        return synced ? 'already' : 'error';
+      }
+      return synced ? 'subscribed' : 'error';
     }
 
-    // Do not call pushManager.subscribe without an explicit click — Chrome can throw
-    // AbortError ("push service error") from background/auto paths and crash the overlay.
+    // Quiet status checks must not create a subscription (needs a user gesture).
     if (!options?.forcePrompt) {
       return 'need';
     }
@@ -101,21 +116,15 @@ export async function enableWebPush(options?: {
     const applicationServerKey = urlBase64ToUint8Array(publicKey);
     // Uncompressed P-256 public key is 65 bytes; anything else will fail subscribe.
     if (applicationServerKey.byteLength !== 65) {
-      console.error('Invalid VAPID public key length', applicationServerKey.byteLength);
       return 'missing_vapid';
     }
 
     const subscription = await subscribePush(registration, applicationServerKey);
-
-    const response = await fetch('/api/push/subscribe', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(subscription.toJSON()),
-    });
-
-    return response.ok ? 'subscribed' : 'error';
+    return (await syncSubscription(subscription)) ? 'subscribed' : 'error';
   } catch (error) {
-    console.error('enableWebPush failed', error);
+    // Log a plain string only — Next.js dev overlay treats console.error(Error) as a crash.
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[okhana] enableWebPush failed: ${message}`);
     return 'error';
   }
 }
