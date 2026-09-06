@@ -157,6 +157,20 @@ export const pushSubscriptions = pgTable('push_subscriptions', {
   index('push_subscriptions_user_idx').on(table.userId),
 ]);
 
+/**
+ * Idempotency log for proactive advance nudges (cron may retry).
+ * dedupeKey encodes kind + entity + occurrence day + lead window.
+ */
+export const proactiveNudgeDeliveries = pgTable('proactive_nudge_deliveries', {
+  id: serial('id').primaryKey(),
+  dedupeKey: varchar('dedupe_key', { length: 255 }).notNull(),
+  familyId: integer('family_id').notNull().references(() => families.id, { onDelete: 'cascade' }),
+  sentAt: timestamp('sent_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex('proactive_nudge_deliveries_dedupe_uidx').on(table.dedupeKey),
+  index('proactive_nudge_deliveries_family_idx').on(table.familyId),
+]);
+
 // 7. ai_conversations
 export const aiConversations = pgTable('ai_conversations', {
   id: serial('id').primaryKey(),
@@ -204,11 +218,19 @@ export const familiesRelations = relations(families, ({ one, many }) => ({
   tasks: many(familyTasks),
   familyDates: many(familyDates),
   conversations: many(aiConversations),
+  proactiveNudgeDeliveries: many(proactiveNudgeDeliveries),
 }));
 
 export const familyDatesRelations = relations(familyDates, ({ one }) => ({
   family: one(families, { fields: [familyDates.familyId], references: [families.id] }),
   creator: one(users, { fields: [familyDates.createdBy], references: [users.id] }),
+}));
+
+export const proactiveNudgeDeliveriesRelations = relations(proactiveNudgeDeliveries, ({ one }) => ({
+  family: one(families, {
+    fields: [proactiveNudgeDeliveries.familyId],
+    references: [families.id],
+  }),
 }));
 
 export const familyTasksRelations = relations(familyTasks, ({ one, many }) => ({
