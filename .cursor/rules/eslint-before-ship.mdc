@@ -1,0 +1,37 @@
+---
+description: Mandatory ESLint on touched files; ban sync setState in useEffect
+alwaysApply: true
+---
+
+# ESLint + React effects (do not skip)
+
+## Before commit, push, or “done”
+
+1. Run ESLint on **every touched** `.ts` / `.tsx` file (not only `npm run test` / `npm run build`):
+   ```bash
+   npx eslint path/to/file.tsx path/to/other.ts
+   ```
+2. Fix all **errors** before pushing. Pre-existing warnings in untouched test mocks are OK to leave.
+3. If CI runs `npm run lint`, assume your new code must not introduce new **errors**.
+
+Test + build green without eslint is an incomplete ship checklist — that caused a CI failure on `install-app-wizard.tsx`.
+
+## `react-hooks/set-state-in-effect`
+
+**Never** call `setState` synchronously in a `useEffect` body.
+
+Forbidden:
+
+```tsx
+useEffect(() => {
+  setPlatform(detect()); // sync — fails CI
+}, []);
+```
+
+Allowed patterns in this repo:
+
+- **Deferred / event callback** — `setTimeout`, promise `.then`, DOM/event listener (see `install-app-wizard.tsx`).
+- **Lazy `useState` initializer** when the value is available on first client render.
+- **Adjust state during render** when syncing from props (see `theme-toggle.tsx`: compare prev prop, then `setState`).
+
+Do not “fix” by disabling the lint rule unless there is a documented exception and no alternative.

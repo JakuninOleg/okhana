@@ -5,6 +5,7 @@ import { FamilyHubMenu } from '@/features/family/family-hub-menu';
 import { FamilySetupForm } from '@/features/family/family-setup-form';
 import { getDashboardFamilyData } from '@/features/family/get-dashboard-family';
 import { FamilyChatLoader } from '@/features/chat/family-chat-loader';
+import { InstallAppWizard } from '@/features/notifications/install-app-wizard';
 import { FamilyTasksPriority } from '@/features/tasks/family-tasks-priority';
 import { loadDashboardActiveTasks } from '@/features/tasks/load-dashboard-tasks';
 import { isLocale, routing } from '@/i18n/routing';
@@ -112,6 +113,7 @@ export default async function DashboardPage({
 
   return (
     <main className="flex min-h-0 flex-1 flex-col py-3 sm:py-4 lg:overflow-hidden">
+      <InstallAppWizard />
       <FamilyHubMenu
         familyName={familyName!}
         inviteCode={inviteCode!}

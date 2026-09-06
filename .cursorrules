@@ -34,6 +34,7 @@ Okhana is an AI-powered family hub. The core principle: **"AI is the architectur
 - **Server Components by default.** Only add `'use client'` when you need hooks, event handlers, or browser APIs.
 - Never import server-only code (database, secrets) into client components.
 - Use `next/link` or the `Link` from `@/i18n/navigation` for routing.
+- **Never** call `setState` synchronously in a `useEffect` body (`react-hooks/set-state-in-effect`). Defer via timeout/event/promise, lazy `useState` init, or prop→state sync during render (`theme-toggle.tsx`, `install-app-wizard.tsx`).
 
 ### Internationalisation
 - **ALL user-facing strings must go through next-intl.** No hardcoded text in JSX.
@@ -62,9 +63,10 @@ Okhana is an AI-powered family hub. The core principle: **"AI is the architectur
 
 ## Before Submitting
 
+- [ ] `npx eslint` on **touched** `.ts`/`.tsx` — zero **errors** (required even after green test/build)
 - [ ] `npm run build` — zero TypeScript errors
 - [ ] `npm run test` — all tests green
-- [ ] `npm run lint` — zero warnings
+- [ ] `npm run lint` — no new errors before PR (full run when practical)
 - [ ] Explain architectural decisions in code comments (WHY, not just WHAT)
 - [ ] Ask before adding new dependencies
 - [ ] Code changes are in small chunks (max 50 lines per diff)
