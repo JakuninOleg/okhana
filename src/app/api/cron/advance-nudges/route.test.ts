@@ -1,15 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockRunAdvanceNudges = vi.hoisted(() => vi.fn());
+const mockRunDailyBriefings = vi.hoisted(() => vi.fn());
 
 vi.mock('@/features/notifications/run-advance-nudges', () => ({
   runAdvanceNudges: (...args: unknown[]) => mockRunAdvanceNudges(...args),
 }));
 
+vi.mock('@/features/notifications/run-daily-briefings', () => ({
+  runDailyBriefings: (...args: unknown[]) => mockRunDailyBriefings(...args),
+}));
+
 describe('GET /api/cron/advance-nudges', () => {
   beforeEach(() => {
     mockRunAdvanceNudges.mockReset();
+    mockRunDailyBriefings.mockReset();
     delete process.env.CRON_SECRET;
+    vi.resetModules();
   });
 
   it('returns 503 when CRON_SECRET is unset', async () => {
@@ -27,13 +34,21 @@ describe('GET /api/cron/advance-nudges', () => {
     expect(mockRunAdvanceNudges).not.toHaveBeenCalled();
   });
 
-  it('runs nudges when authorized', async () => {
+  it('runs nudges and morning briefing when authorized', async () => {
     process.env.CRON_SECRET = 'test-secret';
     mockRunAdvanceNudges.mockResolvedValue({
       planned: 2,
       sent: 1,
       skippedDuplicate: 1,
       familiesScanned: 3,
+    });
+    mockRunDailyBriefings.mockResolvedValue({
+      slot: 'morning',
+      planned: 4,
+      sent: 3,
+      skippedDuplicate: 0,
+      skippedEmpty: 1,
+      membersScanned: 5,
     });
     const { GET } = await import('@/app/api/cron/advance-nudges/route');
     const response = await GET(
@@ -44,11 +59,22 @@ describe('GET /api/cron/advance-nudges', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       ok: true,
-      planned: 2,
-      sent: 1,
-      skippedDuplicate: 1,
-      familiesScanned: 3,
+      nudges: {
+        planned: 2,
+        sent: 1,
+        skippedDuplicate: 1,
+        familiesScanned: 3,
+      },
+      briefing: {
+        slot: 'morning',
+        planned: 4,
+        sent: 3,
+        skippedDuplicate: 0,
+        skippedEmpty: 1,
+        membersScanned: 5,
+      },
     });
     expect(mockRunAdvanceNudges).toHaveBeenCalledOnce();
+    expect(mockRunDailyBriefings).toHaveBeenCalledWith({ slot: 'morning' });
   });
 });
