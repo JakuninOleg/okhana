@@ -80,9 +80,12 @@ a simple calendar, and one real agentic tool-calling scenario.
 - Ask before installing new dependencies.
 - Before declaring a task complete **or** committing/pushing:
   1. `npx eslint` on every touched `.ts`/`.tsx` file — **zero new errors**
-  2. `npm run test` — green
-  3. `npm run build` — zero TypeScript errors  
-  Test/build alone are not enough (CI runs full `npm run lint`).
+  2. **Code review** — Bugbot (required for feature/fix work); Security Review
+     when auth/push/cron/ACL/webhooks/user data are involved; fix high/medium
+     findings before push; summarize for the human
+  3. `npm run test` — green
+  4. `npm run build` — zero TypeScript errors  
+  Test/build alone (without eslint + review) are not enough.
 - Never commit or push — stage changes for human review (unless the human
   explicitly asked to commit/push/PR).
 - Write code in small chunks (max 50 lines per change).

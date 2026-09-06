@@ -1,0 +1,49 @@
+---
+description: Mandatory ESLint + Bugbot/security review before commit/push
+alwaysApply: true
+---
+
+# Ship checklist — ESLint + review (do not skip)
+
+## After writing code — before commit, push, PR, or “done”
+
+Do **in order**. Test/build alone are incomplete.
+
+1. **ESLint** on every touched `.ts` / `.tsx`:
+   ```bash
+   npx eslint path/to/file.tsx path/to/other.ts
+   ```
+   Fix all **errors**. Pre-existing warnings in untouched test mocks may remain.
+
+2. **Code review (mandatory)** — do not push unreviewed feature work:
+   - Run **Bugbot** (`Task` / `subagent_type: "bugbot"`) on the branch or uncommitted changes.
+   - Run **Security Review** (`subagent_type: "security-review"`) when the change touches auth, push, cron, DB ACL, webhooks, payments, or user data.
+   - For smaller pure-UI/i18n tweaks: still do a focused self-review (correctness, i18n, a11y); Bugbot preferred when unsure.
+   - **Fix high/medium findings** (or document why accepted) before push.
+   - Summarize review outcome for the human (table or short bullets).
+
+3. **`npm run test`** — green.
+
+4. **`npm run build`** — zero TypeScript errors.
+
+Skipping review “to save a turn” is not allowed when shipping code — same class of failure as skipping eslint.
+
+## `react-hooks/set-state-in-effect`
+
+**Never** call `setState` synchronously in a `useEffect` body.
+
+Forbidden:
+
+```tsx
+useEffect(() => {
+  setPlatform(detect()); // sync — fails CI
+}, []);
+```
+
+Allowed patterns in this repo:
+
+- **Deferred / event callback** — `setTimeout`, promise `.then`, DOM/event listener (see `install-app-wizard.tsx`).
+- **Lazy `useState` initializer** when the value is available on first client render.
+- **Adjust state during render** when syncing from props (see `theme-toggle.tsx`: compare prev prop, then `setState`).
+
+Do not “fix” by disabling the lint rule unless there is a documented exception and no alternative.
