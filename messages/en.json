@@ -33,7 +33,7 @@
       "inviteTitle": "Invite code",
       "inviteDescription": "Share this code so partner, kids, or relatives can join your family in Okhana.",
       "pushTitle": "Notifications",
-      "pushDescription": "Get push alerts when you are assigned a task or when someone acknowledges a task you created.",
+      "pushDescription": "Alerts for tasks, birthdays, memorable dates, and family calendar events — even when Okhana is closed.",
       "pushChecking": "Checking notification status…",
       "pushEnable": "Enable notifications",
       "pushOn": "Notifications are on for this device.",
@@ -192,6 +192,26 @@
         "not_found": "Date not found.",
         "db_unavailable": "Database is busy. Please try again."
       }
+    },
+    "installWizard": {
+      "title": "Put Okhana on your phone",
+      "subtitle": "Add the icon and turn on alerts so birthdays, dates, and tasks reach you — like a normal app, without the App Store.",
+      "installTitle": "Home screen icon",
+      "installDone": "Okhana is already running as an app on this device.",
+      "installHint": {
+        "ios": "Takes about 15 seconds in Safari.",
+        "android": "Takes about 15 seconds in Chrome.",
+        "desktop": "You can still enable alerts here. On a phone, add the icon for the best experience."
+      },
+      "iosStep1": "Open this page in Safari (not in-app browsers).",
+      "iosStep2Before": "Tap Share",
+      "iosStep2After": ", then “Add to Home Screen”.",
+      "iosStep3": "Confirm Add — Okhana appears on your home screen.",
+      "androidStep1": "Open the Chrome menu (⋮).",
+      "androidStep2": "Tap “Install app” or “Add to Home screen”.",
+      "installButton": "Install Okhana",
+      "pushWhy": "Without alerts, reminders for birthdays and tasks stay inside the browser tab.",
+      "later": "Not now"
     },
     "onboarding": {
       "eyebrow": "Almost there",
