@@ -30,25 +30,13 @@ export function FamilyTasksPriority({
   const t = useTranslations('Dashboard.tasks');
   const locale = useLocale();
   const [tasks, setTasks] = useState(initialTasks);
-  const [pushHint, setPushHint] = useState<'idle' | 'need' | 'on' | 'unsupported'>('idle');
   // Snapshot once — Date.now() during render trips react-hooks/purity.
   const [nowMs] = useState(() => Date.now());
   const knownIdsRef = useRef(new Set(initialTasks.map((task) => task.id)));
 
   useEffect(() => {
-    void enableWebPush().then((result) => {
-      if (result === 'unsupported' || result === 'missing_vapid') {
-        setPushHint('unsupported');
-        return;
-      }
-      if (result === 'denied') {
-        setPushHint('need');
-        return;
-      }
-      if (result === 'subscribed' || result === 'already') {
-        setPushHint('on');
-      }
-    });
+    // Quietly refresh an existing subscription; enable UI lives in family settings.
+    void enableWebPush();
   }, []);
 
   useEffect(() => {
@@ -167,30 +155,6 @@ export function FamilyTasksPriority({
         <p className="mt-3 text-xs text-muted-foreground">
           {t('reminderHint', { title: dueSoon[0].title })}
         </p>
-      ) : null}
-
-      {pushHint === 'need' || pushHint === 'unsupported' ? (
-        <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
-          <p className="text-xs text-muted-foreground">
-            {pushHint === 'unsupported' ? t('pushUnsupported') : t('pushNeedPermission')}
-          </p>
-          {pushHint === 'need' ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                void enableWebPush({ forcePrompt: true }).then((result) => {
-                  if (result === 'subscribed' || result === 'already') {
-                    setPushHint('on');
-                  }
-                });
-              }}
-            >
-              {t('pushEnable')}
-            </Button>
-          ) : null}
-        </div>
       ) : null}
     </section>
   );

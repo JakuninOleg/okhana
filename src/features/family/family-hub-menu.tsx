@@ -13,6 +13,7 @@ import { FamilyMemberAvatar } from '@/features/family/family-member-avatar';
 import { FamilyDatesSheet } from '@/features/family/family-dates-sheet';
 import { InviteCodeDisplay } from '@/features/family/invite-code-display';
 import { MemberProfileSheet } from '@/features/family/member-profile-sheet';
+import { PushNotificationsSettings } from '@/features/notifications/push-notifications-settings';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
@@ -150,12 +151,13 @@ function FamilySettingsSheet({
           <SheetTitle>{t('familySettings')}</SheetTitle>
           <SheetDescription>{familyName}</SheetDescription>
         </SheetHeader>
-        <div className="space-y-3 px-4 py-4">
+        <div className="space-y-4 px-4 py-4">
           <div className="space-y-1">
             <h2 className="text-sm font-medium">{t('inviteTitle')}</h2>
             <p className="text-sm text-muted-foreground">{t('inviteDescription')}</p>
           </div>
           <InviteCodeDisplay code={inviteCode} />
+          <PushNotificationsSettings />
         </div>
       </SheetContent>
     </Sheet>

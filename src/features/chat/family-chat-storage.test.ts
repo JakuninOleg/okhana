@@ -83,4 +83,19 @@ describe('family-chat-storage', () => {
     localMemory.set('okhana.familyChat.draft.v1', '{not-json');
     expect(readStoredFamilyChat()).toEqual({ messages: [], input: '' });
   });
+
+  it('keeps only the last FAMILY_CHAT_UI_WINDOW messages', () => {
+    const messages = Array.from({ length: 35 }, (_, index) => ({
+      id: String(index),
+      role: 'user' as const,
+      content: `m${index}`,
+    }));
+
+    writeStoredFamilyChat({ messages, input: '' });
+
+    const stored = readStoredFamilyChat();
+    expect(stored.messages).toHaveLength(30);
+    expect(stored.messages[0]?.content).toBe('m5');
+    expect(stored.messages.at(-1)?.content).toBe('m34');
+  });
 });

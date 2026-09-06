@@ -9,6 +9,7 @@ import {
   completeTaskAssignment,
 } from '@/features/tasks/update-assignment';
 import {
+  notifyTaskAcknowledged,
   notifyTaskAssigned,
   notifyTaskCompleted,
 } from '@/features/notifications/task-notifications';
@@ -295,11 +296,19 @@ export async function executeAiTool(
     if (!parsed.success) {
       return { error: 'Invalid acknowledge_task arguments' };
     }
-    return acknowledgeTaskAssignment({
+    const result = await acknowledgeTaskAssignment({
       familyId: input.familyId,
       userId: input.userId,
       taskId: parsed.data.taskId,
     });
+    if (result.ok && result.changed) {
+      void notifyTaskAcknowledged({
+        familyId: input.familyId,
+        taskId: parsed.data.taskId,
+        acknowledgedByUserId: input.userId,
+      });
+    }
+    return result;
   }
 
   if (name === 'complete_task') {
@@ -312,7 +321,7 @@ export async function executeAiTool(
       userId: input.userId,
       taskId: parsed.data.taskId,
     });
-    if (result.ok) {
+    if (result.ok && result.changed) {
       void notifyTaskCompleted({
         familyId: input.familyId,
         taskId: parsed.data.taskId,

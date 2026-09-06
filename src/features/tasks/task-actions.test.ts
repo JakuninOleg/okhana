@@ -44,6 +44,7 @@ vi.mock('@/features/tasks/update-assignment', () => ({
 }));
 
 vi.mock('@/features/notifications/task-notifications', () => ({
+  notifyTaskAcknowledged: vi.fn().mockResolvedValue(undefined),
   notifyTaskCompleted: vi.fn().mockResolvedValue(undefined),
 }));
 
@@ -95,7 +96,7 @@ describe('task-actions', () => {
   it('acknowledgeTaskAction forwards to assignment update', async () => {
     mockAuth.mockResolvedValue({ userId: 'clerk_1' });
     mockSelectLimit.mockResolvedValue([{ id: 2, familyId: 7 }]);
-    mockAcknowledge.mockResolvedValue({ ok: true, taskId: 9, status: 'seen' });
+    mockAcknowledge.mockResolvedValue({ ok: true, taskId: 9, status: 'seen', changed: true });
     const { acknowledgeTaskAction } = await load();
 
     await expect(acknowledgeTaskAction(9)).resolves.toEqual({ ok: true, status: 'seen' });

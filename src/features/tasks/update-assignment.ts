@@ -4,7 +4,7 @@ import { withDbRetry } from '@/lib/server/db/client';
 import { familyTaskAssignees, familyTasks } from '@/lib/server/db/schema';
 
 export type UpdateAssignmentResult =
-  | { ok: true; taskId: number; status: 'seen' | 'done' }
+  | { ok: true; taskId: number; status: 'seen' | 'done'; changed: boolean }
   | { ok: false; error: string };
 
 /** Same message for missing / inaccessible tasks — avoid leaking assignment existence. */
@@ -50,7 +50,7 @@ export async function acknowledgeTaskAssignment(input: {
       return { ok: false, error: `Cannot acknowledge task in status ${assignment.status}` };
     }
     if (assignment.status === 'seen') {
-      return { ok: true, taskId: input.taskId, status: 'seen' };
+      return { ok: true, taskId: input.taskId, status: 'seen', changed: false };
     }
 
     const now = new Date();
@@ -59,7 +59,7 @@ export async function acknowledgeTaskAssignment(input: {
       .set({ status: 'seen', seenAt: now })
       .where(eq(familyTaskAssignees.id, assignment.id));
 
-    return { ok: true, taskId: input.taskId, status: 'seen' };
+    return { ok: true, taskId: input.taskId, status: 'seen', changed: true };
   });
 }
 
@@ -103,7 +103,7 @@ export async function completeTaskAssignment(input: {
       return { ok: false, error: 'Assignment is cancelled' };
     }
     if (assignment.status === 'done') {
-      return { ok: true, taskId: input.taskId, status: 'done' };
+      return { ok: true, taskId: input.taskId, status: 'done', changed: false };
     }
 
     const now = new Date();
@@ -116,6 +116,6 @@ export async function completeTaskAssignment(input: {
       })
       .where(eq(familyTaskAssignees.id, assignment.id));
 
-    return { ok: true, taskId: input.taskId, status: 'done' };
+    return { ok: true, taskId: input.taskId, status: 'done', changed: true };
   });
 }
