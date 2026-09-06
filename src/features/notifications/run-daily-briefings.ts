@@ -14,7 +14,6 @@ import {
 } from '@/features/notifications/daily-briefing-plan';
 import { dashboardNotificationUrl } from '@/features/notifications/family-activity-notifications';
 import { sendPushToUsers } from '@/features/notifications/web-push';
-import { isInQuietHours } from '@/features/notifications/quiet-hours';
 import { listVisibleTasks } from '@/features/tasks/list-tasks';
 import { db } from '@/lib/server/db';
 import { withDbRetry } from '@/lib/server/db/client';
@@ -70,7 +69,6 @@ export async function runDailyBriefings(input: {
           name: users.name,
           displayName: users.displayName,
           birthDate: users.birthDate,
-          quietHoursEnabled: users.quietHoursEnabled,
         })
         .from(users)
         .where(eq(users.familyId, family.id)),
@@ -147,15 +145,8 @@ export async function runDailyBriefings(input: {
 
     const sharedDateLines = [...memorableLines, ...birthdayLines];
 
-    const inQuiet = isInQuietHours(now, offsetMinutes);
-
     for (const member of members) {
       membersScanned += 1;
-
-      if (inQuiet && member.quietHoursEnabled) {
-        skippedEmpty += 1;
-        continue;
-      }
 
       const activeTasks = await listVisibleTasks({
         familyId: family.id,

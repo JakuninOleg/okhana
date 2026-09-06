@@ -11,7 +11,6 @@ import {
 } from '@/features/notifications/advance-nudge-plan';
 import { dashboardNotificationUrl } from '@/features/notifications/family-activity-notifications';
 import { sendPushToUsers } from '@/features/notifications/web-push';
-import { isInQuietHours } from '@/features/notifications/quiet-hours';
 import { db } from '@/lib/server/db';
 import { withDbRetry } from '@/lib/server/db/client';
 import {
@@ -60,52 +59,34 @@ export async function runAdvanceNudges(input?: {
 
     const memberIds = await withDbRetry(async () =>
       db
-        .select({
-          id: users.id,
-          quietHoursEnabled: users.quietHoursEnabled,
-        })
+        .select({ id: users.id })
         .from(users)
         .where(eq(users.familyId, family.id)),
     );
-    const inQuiet = isInQuietHours(now, offsetMinutes);
-    const recipientIds = memberIds
-      .filter((row) => !(inQuiet && row.quietHoursEnabled))
-      .map((row) => row.id);
+    const recipientIds = memberIds.map((row) => row.id);
     if (recipientIds.length === 0) {
       continue;
     }
 
     for (const nudge of nudges) {
-      // Legacy family-wide claims (pre quiet-hours) still block re-sends.
-      if (await deliveryExists(nudge.dedupeKey)) {
+      const inserted = await tryRecordDelivery(nudge);
+      if (!inserted) {
         skippedDuplicate += 1;
         continue;
       }
-
-      for (const recipientId of recipientIds) {
-        // Per-recipient claim so quiet-hours users are not permanently skipped
-        // when other members receive the same lead-day nudge overnight.
-        const claimKey = `${nudge.dedupeKey}:u${recipientId}`;
-        const inserted = await tryRecordDelivery({
-          dedupeKey: claimKey,
-          familyId: nudge.familyId,
+      try {
+        // Claim first (idempotent under concurrent cron), but release if push
+        // setup fails so the next daily run can retry this lead window.
+        await sendPushToUsers(recipientIds, {
+          title: 'Okhana',
+          body: nudge.body,
+          url: dashboardNotificationUrl(),
+          tag: nudge.tag,
         });
-        if (!inserted) {
-          skippedDuplicate += 1;
-          continue;
-        }
-        try {
-          await sendPushToUsers([recipientId], {
-            title: 'Okhana',
-            body: nudge.body,
-            url: dashboardNotificationUrl(),
-            tag: nudge.tag,
-          });
-          sent += 1;
-        } catch (error) {
-          await releaseDeliveryClaim(claimKey);
-          console.error('[advance-nudges] push failed, claim released', claimKey, error);
-        }
+        sent += 1;
+      } catch (error) {
+        await releaseDeliveryClaim(nudge.dedupeKey);
+        console.error('[advance-nudges] push failed, claim released', nudge.dedupeKey, error);
       }
     }
   }
@@ -221,15 +202,12 @@ async function collectFamilyNudges(
 }
 
 /** Insert delivery row; returns false if dedupe key already exists. */
-async function tryRecordDelivery(input: {
-  dedupeKey: string;
-  familyId: number;
-}): Promise<boolean> {
+async function tryRecordDelivery(nudge: PlannedAdvanceNudge): Promise<boolean> {
   try {
     await withDbRetry(async () => {
       await db.insert(proactiveNudgeDeliveries).values({
-        dedupeKey: input.dedupeKey,
-        familyId: input.familyId,
+        dedupeKey: nudge.dedupeKey,
+        familyId: nudge.familyId,
       });
     });
     return true;
@@ -239,17 +217,6 @@ async function tryRecordDelivery(input: {
     }
     throw error;
   }
-}
-
-async function deliveryExists(dedupeKey: string): Promise<boolean> {
-  const rows = await withDbRetry(async () =>
-    db
-      .select({ id: proactiveNudgeDeliveries.id })
-      .from(proactiveNudgeDeliveries)
-      .where(eq(proactiveNudgeDeliveries.dedupeKey, dedupeKey))
-      .limit(1),
-  );
-  return rows.length > 0;
 }
 
 async function releaseDeliveryClaim(dedupeKey: string): Promise<void> {

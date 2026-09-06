@@ -44,8 +44,6 @@
       "pushErrorSubscribe": "The browser could not register with the push service (often Chrome ↔ Google FCM). Try another browser or clear site data.",
       "pushErrorSync": "The browser has a subscription, but the server rejected it. Refresh and try again.",
       "pushRetry": "Try again",
-      "quietTitle": "Quiet nights",
-      "quietDescription": "Skip birthday/date reminders and morning/evening digests from 22:00–08:00 (Moscow). Task alerts still come through.",
       "copy": "Copy",
       "copied": "Copied!",
       "membersTitle": "Members",
