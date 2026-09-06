@@ -15,6 +15,7 @@ export type EnableWebPushResult =
   | 'unsupported'
   | 'missing_vapid'
   | 'denied'
+  | 'need'
   | 'subscribed'
   | 'already'
   | 'error';
@@ -39,6 +40,7 @@ export async function enableWebPush(options?: {
   }
 
   let permission = Notification.permission;
+  // Browser only shows the system prompt from a user gesture (button click).
   if (permission === 'default' && options?.forcePrompt) {
     permission = await Notification.requestPermission();
   }
@@ -46,7 +48,8 @@ export async function enableWebPush(options?: {
     return 'denied';
   }
   if (permission !== 'granted') {
-    return 'denied';
+    // Still 'default' — waiting for the user to click Enable.
+    return 'need';
   }
 
   // Dev skips SW register in PwaRegister — register here when enabling push.
