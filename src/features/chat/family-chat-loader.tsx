@@ -8,7 +8,7 @@ export const FamilyChatLoader = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="h-full min-h-[24rem] w-full flex-1 animate-pulse rounded-3xl border border-border/60 bg-muted/30" />
+      <div className="h-full min-h-[24rem] w-full flex-1 animate-pulse rounded-3xl border border-border/60 bg-muted/30 lg:min-h-0" />
     ),
   },
 );

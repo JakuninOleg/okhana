@@ -168,7 +168,7 @@ export function FamilyTasksSheet(): React.JSX.Element {
         <ListTodo className="size-4" />
         <span className="hidden sm:inline">{t('openShort')}</span>
       </SheetTrigger>
-      <SheetContent side="right" className="flex w-full flex-col sm:max-w-md">
+      <SheetContent side="center" className="flex flex-col overflow-hidden">
         <SheetHeader className="border-b border-border/60 pb-4">
           <SheetTitle>{t('title')}</SheetTitle>
           <SheetDescription>{t('description')}</SheetDescription>

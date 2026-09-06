@@ -141,7 +141,7 @@ export function FamilyDatesSheet(): React.JSX.Element {
       >
         <CalendarHeart className="size-4" />
       </SheetTrigger>
-      <SheetContent side="right" className="flex w-full flex-col gap-0 sm:max-w-md">
+      <SheetContent side="center" className="flex flex-col gap-0 overflow-hidden">
         <SheetHeader className="border-b border-border/60">
           <SheetTitle>{t('title')}</SheetTitle>
           <SheetDescription>{t('description')}</SheetDescription>

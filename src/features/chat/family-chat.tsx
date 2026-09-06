@@ -126,10 +126,13 @@ export function FamilyChat(): React.JSX.Element {
   });
 
   const scrollToBottom = useEffectEvent(() => {
+    const list = listRef.current;
     const anchor = bottomAnchorRef.current;
-    // After layout so hub-column scrollHeight includes the new bubbles.
+    // After layout so scrollHeight includes the new bubbles.
     requestAnimationFrame(() => {
-      scrollChatToLatest(anchor);
+      // Desktop: list is the scrollport (footer anchor sits outside it).
+      // Mobile: list is overflow-visible — fall back to page/footer scroll.
+      scrollChatToLatest(anchor, list);
     });
   });
 
@@ -371,8 +374,8 @@ export function FamilyChat(): React.JSX.Element {
       <Card
         className={cn(
           'flex w-full flex-1 flex-col gap-0 border-border/60 bg-card/90 py-0 shadow-sm backdrop-blur-sm',
-          // No nested chat scrollport — mobile uses page scroll; desktop uses the hub column.
-          'overflow-visible',
+          // Mobile: page scrolls. Desktop: card fills remaining height; messages scroll inside.
+          'min-h-[24rem] overflow-visible lg:min-h-0 lg:overflow-hidden',
         )}
       >
         <CardHeader className="shrink-0 gap-3 border-b border-border/60 px-4 py-3 sm:px-5 sm:py-4">
@@ -419,10 +422,10 @@ export function FamilyChat(): React.JSX.Element {
           </div>
         </CardHeader>
 
-        <CardContent className="flex flex-1 flex-col px-0 py-0">
+        <CardContent className="flex min-h-0 flex-1 flex-col px-0 py-0 lg:overflow-hidden">
           <div
             ref={listRef}
-            className="space-y-5 overflow-visible px-4 py-4 sm:px-5 sm:py-5"
+            className="min-h-0 flex-1 space-y-5 overflow-visible px-4 py-4 sm:px-5 sm:py-5 lg:overflow-y-auto lg:overscroll-contain"
             aria-live="polite"
           >
             {status === 'loadingHistory' ? (
@@ -633,7 +636,7 @@ export function FamilyChat(): React.JSX.Element {
           ) : (
             <p className="px-1 text-xs text-muted-foreground">{t('voiceHoldHint')}</p>
           )}
-          {/* Scroll target: keeps the latest reply + composer in view on page/column scroll. */}
+          {/* Mobile page-scroll target (desktop scrolls listRef instead). */}
           <div ref={bottomAnchorRef} className="h-px w-full shrink-0" aria-hidden />
         </CardFooter>
       </Card>

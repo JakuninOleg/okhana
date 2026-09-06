@@ -145,7 +145,7 @@ function FamilySettingsSheet({
       >
         <Settings2 className="size-5" />
       </SheetTrigger>
-      <SheetContent side="right" className="w-full sm:max-w-md">
+      <SheetContent side="center" className="overflow-y-auto">
         <SheetHeader className="border-b border-border/60 pb-4">
           <SheetTitle>{t('familySettings')}</SheetTitle>
           <SheetDescription>{familyName}</SheetDescription>
@@ -174,8 +174,14 @@ export function FamilyHubMenu({
   const [selectedMember, setSelectedMember] = useState<DashboardFamilyMemberProfile | null>(null);
 
   return (
-    <div className="flex flex-1 flex-col gap-3 lg:min-h-0 lg:flex-row lg:gap-4">
-      <aside className="hidden w-72 shrink-0 flex-col gap-4 rounded-2xl border border-border/60 bg-card/80 p-4 shadow-sm backdrop-blur-sm lg:flex xl:w-80">
+    <div className="flex flex-1 flex-col gap-3 lg:min-h-0 lg:flex-row lg:gap-4 lg:overflow-hidden">
+      {/* Desktop: fixed-height shell — page does not scroll; chat owns the scrollport. */}
+      <aside
+        className={cn(
+          'hidden w-72 shrink-0 flex-col gap-4 rounded-2xl border border-border/60 bg-card/80 p-4 shadow-sm backdrop-blur-sm xl:w-80',
+          'lg:flex lg:overflow-y-auto',
+        )}
+      >
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 space-y-1">
             <p className="truncate text-xl font-semibold tracking-tight">{familyName}</p>
@@ -189,7 +195,6 @@ export function FamilyHubMenu({
           </div>
         </div>
 
-        {/* Fixed rail — small member count; do not nest a scrollport here. */}
         <div className="shrink-0 space-y-2">
           <p className="px-1 text-xs font-medium uppercase tracking-[0.16em] text-brand-peach">
             {t('membersTitle')}
@@ -208,7 +213,7 @@ export function FamilyHubMenu({
         </div>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col gap-3 lg:min-h-0 lg:overflow-y-auto">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 lg:overflow-hidden">
         <section className="shrink-0 rounded-2xl border border-border/60 bg-card/80 p-3 shadow-sm backdrop-blur-sm sm:p-4 lg:hidden">
           <div className="mb-3 flex items-center justify-between gap-2">
             <div className="min-w-0">
@@ -235,8 +240,8 @@ export function FamilyHubMenu({
           </ul>
         </section>
 
-        {/* Natural height children — desktop scrolls this column; mobile scrolls the page. */}
-        <div className="flex flex-col gap-3">{children}</div>
+        {/* Tasks shrink-0; chat flex-1 — only the message list scrolls on lg+. */}
+        <div className="flex min-h-0 flex-1 flex-col gap-3">{children}</div>
       </div>
 
       <MemberProfileSheet
