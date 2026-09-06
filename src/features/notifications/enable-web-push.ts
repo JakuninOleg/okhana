@@ -1,6 +1,6 @@
 'use client';
 
-function urlBase64ToUint8Array(base64String: string): Uint8Array {
+function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
   const raw = window.atob(base64);
@@ -8,12 +8,8 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   for (let i = 0; i < raw.length; i += 1) {
     output[i] = raw.charCodeAt(i);
   }
-  // Detach into a clean ArrayBuffer — some Chromium builds reject shared/pooled buffers.
+  // Fresh copy so Chromium gets a plain ArrayBuffer-backed key (not a pooled view).
   return new Uint8Array(output);
-}
-
-function applicationServerKeyBuffer(key: Uint8Array): BufferSource {
-  return key.buffer.slice(key.byteOffset, key.byteOffset + key.byteLength);
 }
 
 export type EnableWebPushResult =
@@ -36,13 +32,12 @@ async function syncSubscription(subscription: PushSubscription): Promise<boolean
 
 async function subscribePush(
   registration: ServiceWorkerRegistration,
-  applicationServerKey: Uint8Array,
+  applicationServerKey: Uint8Array<ArrayBuffer>,
 ): Promise<PushSubscription> {
-  const key = applicationServerKeyBuffer(applicationServerKey);
   try {
     return await registration.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: key,
+      applicationServerKey,
     });
   } catch (firstError) {
     // Already subscribed / stale FCM registration — drop and retry once.
@@ -51,7 +46,7 @@ async function subscribePush(
     try {
       return await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: key,
+        applicationServerKey,
       });
     } catch {
       throw firstError;
