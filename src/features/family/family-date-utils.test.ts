@@ -28,4 +28,9 @@ describe('family-date-utils', () => {
     expect(daysUntilNextOccurrence(6, 15, from)).toBe(0);
     expect(nextOccurrenceIso(6, 15, from)).toBe('2026-06-15');
   });
+
+  it('accepts explicit Y-M-D today (server-TZ safe)', () => {
+    expect(nextOccurrenceIso(6, 21, { year: 2026, month: 9, day: 6 })).toBe('2027-06-21');
+    expect(daysUntilNextOccurrence(9, 6, { year: 2026, month: 9, day: 6 })).toBe(0);
+  });
 });

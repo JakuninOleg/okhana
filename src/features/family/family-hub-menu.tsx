@@ -13,8 +13,10 @@ import { FamilyMemberAvatar } from '@/features/family/family-member-avatar';
 import { FamilyDatesSheet } from '@/features/family/family-dates-sheet';
 import { InviteCodeDisplay } from '@/features/family/invite-code-display';
 import { MemberProfileSheet } from '@/features/family/member-profile-sheet';
+import { FamilyCalendarSheet } from '@/features/calendar/family-calendar-sheet';
+import { FamilyNotesSheet } from '@/features/notes/family-notes-sheet';
+import { HubToolbar, HubToolbarIcon, HubToolbarLabel, hubToolbarTriggerClassName } from '@/features/family/hub-toolbar';
 import { PushNotificationsSettings } from '@/features/notifications/push-notifications-settings';
-import { Button } from '@/components/ui/button';
 import {
   Sheet,
   SheetContent,
@@ -134,17 +136,13 @@ function FamilySettingsSheet({
   return (
     <Sheet>
       <SheetTrigger
-        render={
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="shrink-0"
-            aria-label={t('familySettings')}
-          />
-        }
+        className={hubToolbarTriggerClassName()}
+        aria-label={t('familySettings')}
       >
-        <Settings2 className="size-5" />
+        <HubToolbarIcon>
+          <Settings2 />
+        </HubToolbarIcon>
+        <HubToolbarLabel>{t('settingsShort')}</HubToolbarLabel>
       </SheetTrigger>
       <SheetContent side="center" className="overflow-y-auto">
         <SheetHeader className="border-b border-border/60 pb-4">
@@ -180,21 +178,23 @@ export function FamilyHubMenu({
       {/* Desktop: fixed-height shell — page does not scroll; chat owns the scrollport. */}
       <aside
         className={cn(
-          'hidden w-72 shrink-0 flex-col gap-4 rounded-2xl border border-border/60 bg-card/80 p-4 shadow-sm backdrop-blur-sm xl:w-80',
+          'hidden w-72 shrink-0 flex-col gap-4 rounded-2xl border border-border/70 bg-card/90 p-4 shadow-sm backdrop-blur-sm dark:border-border dark:bg-card xl:w-80',
           'lg:flex lg:overflow-y-auto',
         )}
       >
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0 space-y-1">
-            <p className="truncate text-xl font-semibold tracking-tight">{familyName}</p>
+        <div className="space-y-3">
+          <div className="space-y-1">
+            <p className="text-xl font-semibold tracking-tight">{familyName}</p>
             <p className="text-sm text-muted-foreground">
               {t('membersCount', { count: members.length })}
             </p>
           </div>
-          <div className="flex shrink-0 items-center gap-1">
+          <HubToolbar>
+            <FamilyNotesSheet />
+            <FamilyCalendarSheet />
             <FamilyDatesSheet />
             <FamilySettingsSheet familyName={familyName} inviteCode={inviteCode} />
-          </div>
+          </HubToolbar>
         </div>
 
         <div className="shrink-0 space-y-2">
@@ -216,18 +216,20 @@ export function FamilyHubMenu({
       </aside>
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 lg:overflow-hidden">
-        <section className="shrink-0 rounded-2xl border border-border/60 bg-card/80 p-3 shadow-sm backdrop-blur-sm sm:p-4 lg:hidden">
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <div className="min-w-0">
-              <p className="truncate text-lg font-semibold tracking-tight">{familyName}</p>
+        <section className="shrink-0 rounded-2xl border border-border/70 bg-card/90 p-3 shadow-sm backdrop-blur-sm dark:border-border dark:bg-card sm:p-4 lg:hidden">
+          <div className="mb-3 space-y-3">
+            <div className="space-y-1">
+              <p className="text-lg font-semibold tracking-tight">{familyName}</p>
               <p className="text-sm text-muted-foreground">
                 {t('membersCount', { count: members.length })}
               </p>
             </div>
-            <div className="flex shrink-0 items-center gap-1">
+            <HubToolbar>
+              <FamilyNotesSheet />
+              <FamilyCalendarSheet />
               <FamilyDatesSheet />
               <FamilySettingsSheet familyName={familyName} inviteCode={inviteCode} />
-            </div>
+            </HubToolbar>
           </div>
           <ul className="-mx-0.5 flex gap-2 overflow-x-auto px-0.5 pb-1 snap-x snap-mandatory">
             {members.map((member) => (

@@ -87,7 +87,7 @@ export default async function DashboardPage({
       <main className="relative flex flex-1 flex-col overflow-y-auto py-6 sm:py-10">
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--brand-sun)_0%,_transparent_55%),radial-gradient(ellipse_at_bottom,_var(--brand-aqua)_0%,_transparent_50%)] opacity-60 dark:opacity-20"
+          className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--brand-sun)_0%,_transparent_55%),radial-gradient(ellipse_at_bottom,_var(--brand-aqua)_0%,_transparent_50%)] opacity-60 dark:bg-[radial-gradient(ellipse_at_top,_var(--brand-sun)_0%,_transparent_50%),radial-gradient(ellipse_at_bottom,_var(--brand-peach)_0%,_transparent_45%)] dark:opacity-22"
         />
         <div className="relative mx-auto flex w-full max-w-lg flex-col gap-6 px-1">
           <header className="space-y-2 text-center sm:text-left">

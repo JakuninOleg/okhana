@@ -9,7 +9,14 @@ import {
   isValidMonthDay,
   type FamilyDateRecord,
 } from '@/features/family/family-date-utils';
+import { createFamilyDate } from '@/features/family/create-family-date';
 import { listFamilyDates } from '@/features/family/list-family-dates';
+import {
+  listMemberBirthdays,
+  type MemberBirthdayRecord,
+} from '@/features/family/list-member-birthdays';
+import { notifyMemorableDateCreated } from '@/features/notifications/family-activity-notifications';
+import { calendarYmdFromClientNow } from '@/features/calendar/calendar-time';
 import { db } from '@/lib/server/db';
 import { withDbRetry } from '@/lib/server/db/client';
 import { familyDates } from '@/lib/server/db/schema';
@@ -22,6 +29,7 @@ export type FamilyDateActionError =
   | 'not_found'
   | 'db_unavailable';
 
+export type { MemberBirthdayRecord };
 const createSchema = z.object({
   title: z.string().trim().min(1).max(255),
   kind: z.enum(FAMILY_DATE_KINDS),
@@ -47,8 +55,15 @@ function canManageDates(role: string): boolean {
   return role === 'owner' || role === 'adult';
 }
 
-export async function loadFamilyDatesAction(): Promise<
-  { ok: true; dates: FamilyDateRecord[]; canManage: boolean }
+export async function loadFamilyDatesAction(input?: {
+  clientNow?: string;
+}): Promise<
+  {
+    ok: true;
+    dates: FamilyDateRecord[];
+    memberBirthdays: MemberBirthdayRecord[];
+    canManage: boolean;
+  }
   | { ok: false; error: FamilyDateActionError }
 > {
   const { userId: clerkUserId } = await auth();
@@ -61,10 +76,15 @@ export async function loadFamilyDatesAction(): Promise<
     if (!actor) {
       return { ok: false, error: 'forbidden' };
     }
-    const dates = await listFamilyDates(actor.familyId);
+    const today = calendarYmdFromClientNow(input?.clientNow ?? null) ?? undefined;
+    const [dates, memberBirthdays] = await Promise.all([
+      listFamilyDates(actor.familyId, today ? { today } : undefined),
+      listMemberBirthdays(actor.familyId, today ? { today } : undefined),
+    ]);
     return {
       ok: true,
       dates,
+      memberBirthdays,
       canManage: canManageDates(actor.familyRole),
     };
   } catch {
@@ -98,24 +118,26 @@ export async function createFamilyDateAction(
       ? null
       : parsed.data.year;
 
-    const [row] = await withDbRetry(async () =>
-      db
-        .insert(familyDates)
-        .values({
-          familyId: actor.familyId,
-          title: parsed.data.title,
-          kind: parsed.data.kind,
-          month: parsed.data.month,
-          day: parsed.data.day,
-          year: yearValue,
-          notes: parsed.data.notes?.length ? parsed.data.notes : null,
-          createdBy: actor.userId,
-        })
-        .returning({ id: familyDates.id }),
-    );
+    const created = await createFamilyDate({
+      familyId: actor.familyId,
+      createdBy: actor.userId,
+      title: parsed.data.title,
+      kind: parsed.data.kind,
+      month: parsed.data.month,
+      day: parsed.data.day,
+      year: yearValue,
+      notes: parsed.data.notes?.length ? parsed.data.notes : null,
+    });
+
+    void notifyMemorableDateCreated({
+      familyId: actor.familyId,
+      createdBy: actor.userId,
+      dateId: created.id,
+      dateTitle: parsed.data.title,
+    });
 
     revalidatePath('/[locale]/dashboard', 'page');
-    return { ok: true, id: row.id };
+    return { ok: true, id: created.id };
   } catch {
     return { ok: false, error: 'db_unavailable' };
   }

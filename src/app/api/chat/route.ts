@@ -252,6 +252,7 @@ export async function POST(request: Request): Promise<Response> {
         familyId: context.familyId,
         userId: context.userId,
         familyRole: context.familyRole,
+        clientNow: clientNow ?? null,
       }
       : undefined,
     signal: request.signal,

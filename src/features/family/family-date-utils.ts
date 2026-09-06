@@ -13,34 +13,58 @@ export type FamilyDateRecord = {
   nextOccurrence: string;
 };
 
+/** Explicit calendar day — avoids server-TZ bugs when anchoring “today”. */
+export type CalendarYmd = {
+  year: number;
+  month: number;
+  day: number;
+};
+
+export function calendarYmdFromDate(from: Date): CalendarYmd {
+  return {
+    year: from.getFullYear(),
+    month: from.getMonth() + 1,
+    day: from.getDate(),
+  };
+}
+
+function toYmd(from: Date | CalendarYmd): CalendarYmd {
+  return from instanceof Date ? calendarYmdFromDate(from) : from;
+}
+
+function utcDay(year: number, month: number, day: number): number {
+  return Date.UTC(year, month - 1, day);
+}
+
 /** Days from `from` until next month/day (0 = today). */
 export function daysUntilNextOccurrence(
   month: number,
   day: number,
-  from: Date = new Date(),
+  from: Date | CalendarYmd = new Date(),
 ): number {
-  const start = new Date(from.getFullYear(), from.getMonth(), from.getDate());
-  let candidate = new Date(start.getFullYear(), month - 1, day);
-  if (candidate < start) {
-    candidate = new Date(start.getFullYear() + 1, month - 1, day);
+  const start = toYmd(from);
+  let year = start.year;
+  if (utcDay(year, month, day) < utcDay(start.year, start.month, start.day)) {
+    year += 1;
   }
-  return Math.round((candidate.getTime() - start.getTime()) / 86_400_000);
+  return Math.round(
+    (utcDay(year, month, day) - utcDay(start.year, start.month, start.day)) / 86_400_000,
+  );
 }
 
 export function nextOccurrenceIso(
   month: number,
   day: number,
-  from: Date = new Date(),
+  from: Date | CalendarYmd = new Date(),
 ): string {
-  const start = new Date(from.getFullYear(), from.getMonth(), from.getDate());
-  let candidate = new Date(start.getFullYear(), month - 1, day);
-  if (candidate < start) {
-    candidate = new Date(start.getFullYear() + 1, month - 1, day);
+  const start = toYmd(from);
+  let year = start.year;
+  if (utcDay(year, month, day) < utcDay(start.year, start.month, start.day)) {
+    year += 1;
   }
-  const y = candidate.getFullYear();
-  const m = String(candidate.getMonth() + 1).padStart(2, '0');
-  const d = String(candidate.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
+  const m = String(month).padStart(2, '0');
+  const d = String(day).padStart(2, '0');
+  return `${year}-${m}-${d}`;
 }
 
 export function isValidMonthDay(month: number, day: number): boolean {

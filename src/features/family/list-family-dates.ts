@@ -2,6 +2,7 @@ import { asc, eq } from 'drizzle-orm';
 import {
   daysUntilNextOccurrence,
   nextOccurrenceIso,
+  type CalendarYmd,
   type FamilyDateKind,
   type FamilyDateRecord,
 } from '@/features/family/family-date-utils';
@@ -9,7 +10,10 @@ import { db } from '@/lib/server/db';
 import { withDbRetry } from '@/lib/server/db/client';
 import { familyDates } from '@/lib/server/db/schema';
 
-export async function listFamilyDates(familyId: number): Promise<FamilyDateRecord[]> {
+export async function listFamilyDates(
+  familyId: number,
+  options?: { today?: CalendarYmd },
+): Promise<FamilyDateRecord[]> {
   const rows = await withDbRetry(async () =>
     db
       .select({
@@ -26,7 +30,12 @@ export async function listFamilyDates(familyId: number): Promise<FamilyDateRecor
       .orderBy(asc(familyDates.month), asc(familyDates.day)),
   );
 
-  const now = new Date();
+  const today = options?.today ?? {
+    year: new Date().getFullYear(),
+    month: new Date().getMonth() + 1,
+    day: new Date().getDate(),
+  };
+
   return rows
     .map((row) => ({
       id: row.id,
@@ -36,11 +45,11 @@ export async function listFamilyDates(familyId: number): Promise<FamilyDateRecor
       day: row.day,
       year: row.year,
       notes: row.notes,
-      nextOccurrence: nextOccurrenceIso(row.month, row.day, now),
+      nextOccurrence: nextOccurrenceIso(row.month, row.day, today),
     }))
     .sort(
       (a, b) =>
-        daysUntilNextOccurrence(a.month, a.day, now)
-        - daysUntilNextOccurrence(b.month, b.day, now),
+        daysUntilNextOccurrence(a.month, a.day, today)
+        - daysUntilNextOccurrence(b.month, b.day, today),
     );
 }

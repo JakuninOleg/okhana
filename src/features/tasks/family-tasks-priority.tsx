@@ -8,6 +8,7 @@ import { requestFamilyChatSend } from '@/features/chat/family-chat-store';
 import { enableWebPush } from '@/features/notifications/enable-web-push';
 import type { VisibleTask } from '@/features/tasks/list-tasks';
 import { FamilyTasksSheet } from '@/features/tasks/family-tasks-sheet';
+import { formatDateTimeMedium } from '@/lib/format-date';
 import { cn } from '@/lib/utils';
 
 type FamilyTasksPriorityProps = {
@@ -18,10 +19,7 @@ function formatDue(iso: string | null, locale: string): string | null {
   if (!iso) return null;
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return null;
-  return new Intl.DateTimeFormat(locale, {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(date);
+  return formatDateTimeMedium(date, locale);
 }
 
 export function FamilyTasksPriority({
@@ -96,7 +94,7 @@ export function FamilyTasksPriority({
     .sort((a, b) => String(a.dueAt).localeCompare(String(b.dueAt)));
 
   return (
-    <section className="shrink-0 rounded-2xl border border-brand-peach/40 bg-brand-sun/30 p-3 shadow-sm sm:p-4 dark:bg-brand-sun/10">
+    <section className="shrink-0 rounded-2xl border border-brand-peach/40 bg-brand-sun/30 p-3 shadow-sm sm:p-4 dark:border-brand-peach/50 dark:bg-brand-sun/15">
       <div className="mb-3 flex items-start justify-between gap-3">
         <div className="min-w-0 space-y-1">
           <h2 className="flex items-center gap-2 text-base font-semibold tracking-tight sm:text-lg">

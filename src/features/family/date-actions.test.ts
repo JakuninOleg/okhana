@@ -3,7 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mockAuth = vi.hoisted(() => vi.fn());
 const mockEnsureDbUser = vi.hoisted(() => vi.fn());
 const mockListFamilyDates = vi.hoisted(() => vi.fn());
-const mockInsertReturning = vi.hoisted(() => vi.fn());
+const mockListMemberBirthdays = vi.hoisted(() => vi.fn());
+const mockCreateFamilyDate = vi.hoisted(() => vi.fn());
 const mockDeleteReturning = vi.hoisted(() => vi.fn());
 const mockRevalidatePath = vi.hoisted(() => vi.fn());
 
@@ -19,6 +20,18 @@ vi.mock('@/features/family/list-family-dates', () => ({
   listFamilyDates: (...args: unknown[]) => mockListFamilyDates(...args),
 }));
 
+vi.mock('@/features/family/list-member-birthdays', () => ({
+  listMemberBirthdays: (...args: unknown[]) => mockListMemberBirthdays(...args),
+}));
+
+vi.mock('@/features/notifications/family-activity-notifications', () => ({
+  notifyMemorableDateCreated: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('@/features/family/create-family-date', () => ({
+  createFamilyDate: (...args: unknown[]) => mockCreateFamilyDate(...args),
+}));
+
 vi.mock('next/cache', () => ({
   revalidatePath: (...args: unknown[]) => mockRevalidatePath(...args),
 }));
@@ -29,11 +42,6 @@ vi.mock('@/lib/server/db/client', () => ({
 
 vi.mock('@/lib/server/db', () => ({
   db: {
-    insert: vi.fn(() => ({
-      values: vi.fn(() => ({
-        returning: (...args: unknown[]) => mockInsertReturning(...args),
-      })),
-    })),
     delete: vi.fn(() => ({
       where: vi.fn(() => ({
         returning: (...args: unknown[]) => mockDeleteReturning(...args),
@@ -59,12 +67,13 @@ describe('family date actions', () => {
     mockAuth.mockReset();
     mockEnsureDbUser.mockReset();
     mockListFamilyDates.mockReset();
-    mockInsertReturning.mockReset();
+    mockListMemberBirthdays.mockReset();
+    mockCreateFamilyDate.mockReset();
     mockDeleteReturning.mockReset();
     mockRevalidatePath.mockReset();
   });
 
-  it('loadFamilyDatesAction returns dates for family members', async () => {
+  it('loadFamilyDatesAction returns dates and member birthdays', async () => {
     mockAuth.mockResolvedValue({ userId: 'clerk_1' });
     mockEnsureDbUser.mockResolvedValue({ id: 2, familyId: 9, familyRole: 'adult' });
     mockListFamilyDates.mockResolvedValue([
@@ -79,6 +88,16 @@ describe('family date actions', () => {
         nextOccurrence: '2027-06-15',
       },
     ]);
+    mockListMemberBirthdays.mockResolvedValue([
+      {
+        userId: 2,
+        displayName: 'Олег',
+        month: 1,
+        day: 15,
+        year: 1990,
+        nextOccurrence: '2027-01-15',
+      },
+    ]);
 
     const { loadFamilyDatesAction } = await import('./date-actions');
     await expect(loadFamilyDatesAction()).resolves.toEqual({
@@ -86,6 +105,9 @@ describe('family date actions', () => {
       canManage: true,
       dates: [
         expect.objectContaining({ title: 'Wedding', kind: 'anniversary' }),
+      ],
+      memberBirthdays: [
+        expect.objectContaining({ displayName: 'Олег', month: 1, day: 15 }),
       ],
     });
   });
@@ -103,12 +125,20 @@ describe('family date actions', () => {
         day: 15,
       }),
     ).resolves.toEqual({ ok: false, error: 'forbidden' });
+    expect(mockCreateFamilyDate).not.toHaveBeenCalled();
   });
 
   it('createFamilyDateAction inserts a valid recurring date', async () => {
     mockAuth.mockResolvedValue({ userId: 'clerk_1' });
     mockEnsureDbUser.mockResolvedValue({ id: 2, familyId: 9, familyRole: 'owner' });
-    mockInsertReturning.mockResolvedValue([{ id: 44 }]);
+    mockCreateFamilyDate.mockResolvedValue({
+      id: 44,
+      title: 'Wedding',
+      kind: 'anniversary',
+      month: 6,
+      day: 15,
+      year: 2018,
+    });
 
     const { createFamilyDateAction } = await import('./date-actions');
     await expect(
@@ -121,6 +151,16 @@ describe('family date actions', () => {
         notes: 'Together',
       }),
     ).resolves.toEqual({ ok: true, id: 44 });
+    expect(mockCreateFamilyDate).toHaveBeenCalledWith({
+      familyId: 9,
+      createdBy: 2,
+      title: 'Wedding',
+      kind: 'anniversary',
+      month: 6,
+      day: 15,
+      year: 2018,
+      notes: 'Together',
+    });
     expect(mockRevalidatePath).toHaveBeenCalled();
   });
 
