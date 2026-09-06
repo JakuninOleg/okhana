@@ -102,10 +102,7 @@ export async function enableWebPush(options?: {
       // Never call subscribe() again while a subscription exists — Chromium throws
       // AbortError: "Registration failed - push service error".
       const synced = await syncSubscription(existing);
-      if (!options?.forcePrompt) {
-        return synced ? 'already' : 'error';
-      }
-      return synced ? 'subscribed' : 'error';
+      return synced ? 'already' : 'error';
     }
 
     // Quiet status checks must not create a subscription (needs a user gesture).

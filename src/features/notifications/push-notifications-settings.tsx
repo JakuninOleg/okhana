@@ -54,15 +54,17 @@ export function PushNotificationsSettings(): React.JSX.Element {
           <p className="text-sm text-muted-foreground">
             {status === 'loading'
               ? t('pushChecking')
-              : on
-                ? t('pushOn')
-                : status === 'denied'
-                  ? t('pushDenied')
-                  : status === 'error'
-                    ? t('pushError')
-                    : status === 'unsupported' || status === 'missing_vapid'
-                      ? t('pushUnsupported')
-                      : t('pushDescription')}
+              : status === 'already'
+                ? t('pushAlready')
+                : status === 'subscribed'
+                  ? t('pushOn')
+                  : status === 'denied'
+                    ? t('pushDenied')
+                    : status === 'error'
+                      ? t('pushError')
+                      : status === 'unsupported' || status === 'missing_vapid'
+                        ? t('pushUnsupported')
+                        : t('pushDescription')}
           </p>
         </div>
       </div>
