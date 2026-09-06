@@ -8,10 +8,6 @@ import { enableWebPush, type EnableWebPushResult } from '@/features/notification
 
 type PushUiStatus = 'loading' | EnableWebPushResult;
 
-function isPushError(status: PushUiStatus): boolean {
-  return status === 'error' || status === 'error_subscribe' || status === 'error_sync';
-}
-
 export function PushNotificationsSettings(): React.JSX.Element {
   const t = useTranslations('Dashboard.familyHub');
   const [status, setStatus] = useState<PushUiStatus>('loading');
@@ -37,7 +33,7 @@ export function PushNotificationsSettings(): React.JSX.Element {
   }
 
   const on = status === 'subscribed' || status === 'already';
-  const canEnable = status === 'need' || isPushError(status);
+  const canEnable = status === 'need' || status === 'error';
 
   return (
     <div className="space-y-3 rounded-2xl border border-border/60 bg-muted/20 p-3">
@@ -47,7 +43,7 @@ export function PushNotificationsSettings(): React.JSX.Element {
             <Loader2 className="size-4 animate-spin" aria-hidden />
           ) : on ? (
             <BellRing className="size-4" aria-hidden />
-          ) : status === 'denied' || status === 'unsupported' || status === 'missing_vapid' || isPushError(status) ? (
+          ) : status === 'denied' || status === 'unsupported' || status === 'missing_vapid' || status === 'error' ? (
             <BellOff className="size-4" aria-hidden />
           ) : (
             <Bell className="size-4" aria-hidden />
@@ -64,15 +60,11 @@ export function PushNotificationsSettings(): React.JSX.Element {
                   ? t('pushOn')
                   : status === 'denied'
                     ? t('pushDenied')
-                    : status === 'error_subscribe'
-                      ? t('pushErrorSubscribe')
-                      : status === 'error_sync'
-                        ? t('pushErrorSync')
-                        : status === 'error'
-                          ? t('pushError')
-                          : status === 'unsupported' || status === 'missing_vapid'
-                            ? t('pushUnsupported')
-                            : t('pushDescription')}
+                    : status === 'error'
+                      ? t('pushError')
+                      : status === 'unsupported' || status === 'missing_vapid'
+                        ? t('pushUnsupported')
+                        : t('pushDescription')}
           </p>
         </div>
       </div>
@@ -85,7 +77,7 @@ export function PushNotificationsSettings(): React.JSX.Element {
           onClick={enable}
         >
           {pending ? <Loader2 className="size-3.5 animate-spin" /> : null}
-          {isPushError(status) ? t('pushRetry') : t('pushEnable')}
+          {status === 'error' ? t('pushRetry') : t('pushEnable')}
         </Button>
       ) : null}
     </div>

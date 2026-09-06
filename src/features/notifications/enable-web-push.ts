@@ -19,9 +19,7 @@ export type EnableWebPushResult =
   | 'need'
   | 'subscribed'
   | 'already'
-  | 'error'
-  | 'error_subscribe'
-  | 'error_sync';
+  | 'error';
 
 async function syncSubscription(subscription: PushSubscription): Promise<boolean> {
   const response = await fetch('/api/push/subscribe', {
@@ -99,7 +97,7 @@ export async function enableWebPush(options?: {
       // Never call subscribe() again while a subscription exists — Chromium throws
       // AbortError: "Registration failed - push service error".
       const synced = await syncSubscription(existing);
-      return synced ? 'already' : 'error_sync';
+      return synced ? 'already' : 'error';
     }
 
     // Quiet status checks must not create a subscription (needs a user gesture).
@@ -113,16 +111,8 @@ export async function enableWebPush(options?: {
       return 'missing_vapid';
     }
 
-    let subscription: PushSubscription;
-    try {
-      subscription = await subscribePush(registration, applicationServerKey);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      console.warn(`[okhana] push subscribe failed: ${message}`);
-      return 'error_subscribe';
-    }
-
-    return (await syncSubscription(subscription)) ? 'subscribed' : 'error_sync';
+    const subscription = await subscribePush(registration, applicationServerKey);
+    return (await syncSubscription(subscription)) ? 'subscribed' : 'error';
   } catch (error) {
     // Log a plain string only — Next.js dev overlay treats console.error(Error) as a crash.
     const message = error instanceof Error ? error.message : String(error);
