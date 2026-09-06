@@ -43,22 +43,6 @@ export function InstallAppWizard(): React.JSX.Element | null {
   const [pending, startTransition] = useTransition();
 
   useEffect(() => {
-    const ua = navigator.userAgent;
-    const nextPlatform = detectInstallPlatform({
-      userAgent: ua,
-      platform: navigator.platform,
-      maxTouchPoints: navigator.maxTouchPoints,
-    });
-    setPlatform(nextPlatform);
-
-    const nextStandalone = isStandaloneDisplay({
-      matchMedia: (query) => window.matchMedia(query),
-      navigatorStandalone: Boolean(
-        (navigator as Navigator & { standalone?: boolean }).standalone,
-      ),
-    });
-    setStandalone(nextStandalone);
-
     const onBeforeInstall = (event: Event): void => {
       event.preventDefault();
       setDeferredPrompt(event as BeforeInstallPromptEvent);
@@ -66,12 +50,27 @@ export function InstallAppWizard(): React.JSX.Element | null {
     window.addEventListener('beforeinstallprompt', onBeforeInstall);
 
     let cancelled = false;
+    // Defer all client detection + setState out of the effect body so we do not
+    // trip react-hooks/set-state-in-effect (sync setState → cascading render).
     const timer = window.setTimeout(() => {
       void (async () => {
+        const nextPlatform = detectInstallPlatform({
+          userAgent: navigator.userAgent,
+          platform: navigator.platform,
+          maxTouchPoints: navigator.maxTouchPoints,
+        });
+        const nextStandalone = isStandaloneDisplay({
+          matchMedia: (query) => window.matchMedia(query),
+          navigatorStandalone: Boolean(
+            (navigator as Navigator & { standalone?: boolean }).standalone,
+          ),
+        });
         const push = await enableWebPush();
         if (cancelled) {
           return;
         }
+        setPlatform(nextPlatform);
+        setStandalone(nextStandalone);
         setPushStatus(push);
         const pushReady = push === 'subscribed' || push === 'already';
         const dismissedAt = readWizardDismissedAt(window.localStorage);
