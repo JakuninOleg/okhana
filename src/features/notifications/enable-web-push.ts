@@ -20,6 +20,30 @@ export type EnableWebPushResult =
   | 'already'
   | 'error';
 
+async function subscribePush(
+  registration: ServiceWorkerRegistration,
+  applicationServerKey: Uint8Array,
+): Promise<PushSubscription> {
+  try {
+    return await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: applicationServerKey as BufferSource,
+    });
+  } catch (firstError) {
+    // Stale FCM registration / key rotation — drop and retry once.
+    const stale = await registration.pushManager.getSubscription();
+    await stale?.unsubscribe().catch(() => undefined);
+    try {
+      return await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: applicationServerKey as BufferSource,
+      });
+    } catch {
+      throw firstError;
+    }
+  }
+}
+
 export async function enableWebPush(options?: {
   forcePrompt?: boolean;
 }): Promise<EnableWebPushResult> {
@@ -30,52 +54,68 @@ export async function enableWebPush(options?: {
     return 'unsupported';
   }
 
-  const configResponse = await fetch('/api/push/subscribe');
-  if (!configResponse.ok) {
-    return 'missing_vapid';
-  }
-  const config = (await configResponse.json()) as { configured?: boolean; publicKey?: string };
-  if (!config.configured || !config.publicKey) {
-    return 'missing_vapid';
-  }
+  try {
+    const configResponse = await fetch('/api/push/subscribe');
+    if (!configResponse.ok) {
+      return 'missing_vapid';
+    }
+    const config = (await configResponse.json()) as { configured?: boolean; publicKey?: string };
+    const publicKey = config.publicKey?.trim();
+    if (!config.configured || !publicKey) {
+      return 'missing_vapid';
+    }
 
-  let permission = Notification.permission;
-  // Browser only shows the system prompt from a user gesture (button click).
-  if (permission === 'default' && options?.forcePrompt) {
-    permission = await Notification.requestPermission();
-  }
-  if (permission === 'denied') {
-    return 'denied';
-  }
-  if (permission !== 'granted') {
-    // Still 'default' — waiting for the user to click Enable.
-    return 'need';
-  }
+    let permission = Notification.permission;
+    // Browser only shows the system prompt from a user gesture (button click).
+    if (permission === 'default' && options?.forcePrompt) {
+      permission = await Notification.requestPermission();
+    }
+    if (permission === 'denied') {
+      return 'denied';
+    }
+    if (permission !== 'granted') {
+      // Still 'default' — waiting for the user to click Enable.
+      return 'need';
+    }
 
-  // Dev skips SW register in PwaRegister — register here when enabling push.
-  const registration = await navigator.serviceWorker.register('/sw.js');
-  await navigator.serviceWorker.ready;
+    // Dev skips SW register in PwaRegister — register here when enabling push.
+    const registration = await navigator.serviceWorker.register('/sw.js');
+    await navigator.serviceWorker.ready;
 
-  const existing = await registration.pushManager.getSubscription();
-  if (existing && !options?.forcePrompt) {
-    await fetch('/api/push/subscribe', {
+    const existing = await registration.pushManager.getSubscription();
+    if (existing && !options?.forcePrompt) {
+      const sync = await fetch('/api/push/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(existing.toJSON()),
+      });
+      return sync.ok ? 'already' : 'error';
+    }
+
+    // Do not call pushManager.subscribe without an explicit click — Chrome can throw
+    // AbortError ("push service error") from background/auto paths and crash the overlay.
+    if (!options?.forcePrompt) {
+      return 'need';
+    }
+
+    const applicationServerKey = urlBase64ToUint8Array(publicKey);
+    // Uncompressed P-256 public key is 65 bytes; anything else will fail subscribe.
+    if (applicationServerKey.byteLength !== 65) {
+      console.error('Invalid VAPID public key length', applicationServerKey.byteLength);
+      return 'missing_vapid';
+    }
+
+    const subscription = await subscribePush(registration, applicationServerKey);
+
+    const response = await fetch('/api/push/subscribe', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(existing.toJSON()),
+      body: JSON.stringify(subscription.toJSON()),
     });
-    return 'already';
+
+    return response.ok ? 'subscribed' : 'error';
+  } catch (error) {
+    console.error('enableWebPush failed', error);
+    return 'error';
   }
-
-  const subscription = existing ?? await registration.pushManager.subscribe({
-    userVisibleOnly: true,
-    applicationServerKey: urlBase64ToUint8Array(config.publicKey) as BufferSource,
-  });
-
-  const response = await fetch('/api/push/subscribe', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(subscription.toJSON()),
-  });
-
-  return response.ok ? 'subscribed' : 'error';
 }

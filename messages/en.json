@@ -37,6 +37,8 @@
       "pushOn": "Notifications are on for this device.",
       "pushDenied": "The browser blocked notifications. Allow them in site settings.",
       "pushUnsupported": "Push notifications are not available in this browser yet.",
+      "pushError": "Could not connect to the browser push service. Check your network and try again.",
+      "pushRetry": "Try again",
       "copy": "Copy",
       "copied": "Copied!",
       "membersTitle": "Members",
