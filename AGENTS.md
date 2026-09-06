@@ -34,6 +34,10 @@ a simple calendar, and one real agentic tool-calling scenario.
 - Auth checks belong on each protected page/Server Action, not only in
   `proxy.ts` (defense in depth — see Clerk's `createRouteMatcher`
   deprecation notice, CVE-2026-41248).
+- **Never** call `setState` synchronously inside a `useEffect` body
+  (`react-hooks/set-state-in-effect`). Defer via timeout/event/promise,
+  use a lazy `useState` init, or sync from props during render
+  (see `theme-toggle.tsx` / `install-app-wizard.tsx`).
 
 ## i18n
 - All user-facing strings must use `next-intl` translations.
@@ -74,8 +78,13 @@ a simple calendar, and one real agentic tool-calling scenario.
 - Read `AGENTS.md` at the start of each session.
 - Explain architectural decisions in comments.
 - Ask before installing new dependencies.
-- Run `npm run build` before declaring a task complete.
-- Never commit or push — stage changes for human review.
+- Before declaring a task complete **or** committing/pushing:
+  1. `npx eslint` on every touched `.ts`/`.tsx` file — **zero new errors**
+  2. `npm run test` — green
+  3. `npm run build` — zero TypeScript errors  
+  Test/build alone are not enough (CI runs full `npm run lint`).
+- Never commit or push — stage changes for human review (unless the human
+  explicitly asked to commit/push/PR).
 - Write code in small chunks (max 50 lines per change).
 
 ## Security
