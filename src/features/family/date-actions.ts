@@ -29,7 +29,11 @@ export type FamilyDateActionError =
   | 'not_found'
   | 'db_unavailable';
 
-export type { MemberBirthdayRecord };
+// Do not `export type { MemberBirthdayRecord }` from this `'use server'` module:
+// Next/SWC can emit a runtime re-export of the erased type →
+// ReferenceError: MemberBirthdayRecord is not defined (breaks /dashboard SSR).
+// Clients import the type from `@/features/family/list-member-birthdays`.
+
 const createSchema = z.object({
   title: z.string().trim().min(1).max(255),
   kind: z.enum(FAMILY_DATE_KINDS),
