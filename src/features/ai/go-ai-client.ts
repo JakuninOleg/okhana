@@ -159,6 +159,14 @@ export async function readGoAiSafeError(response: Response): Promise<GoAiSafeErr
         message: 'The model gateway rejected authentication. Check GO_AI_SHARED_SECRET.',
       };
     }
+    if (upstreamMessage && /could not process file/i.test(upstreamMessage)) {
+      return {
+        status: response.status,
+        code,
+        message:
+          'Could not read the voice recording. Hold the mic a bit longer and try again (iPhone works best with a short pause after you press).',
+      };
+    }
     if (upstreamMessage && upstreamMessage.length <= 120 && !/[{\n]/.test(upstreamMessage)) {
       return {
         status: response.status,

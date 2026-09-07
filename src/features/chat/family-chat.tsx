@@ -118,7 +118,19 @@ export function FamilyChat(): React.JSX.Element {
       void submitMessageRef.current(text);
     },
     onError: (message) => {
-      setErrorMessage(message);
+      if (
+        /could not process file|Could not read the voice recording|Microphone permission/i.test(
+          message,
+        )
+      ) {
+        setErrorMessage(
+          /Microphone permission/i.test(message)
+            ? t('voiceMicDenied')
+            : t('voiceTranscribeFailed'),
+        );
+      } else {
+        setErrorMessage(message);
+      }
       setStatus('error');
     },
   });

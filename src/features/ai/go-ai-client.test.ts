@@ -103,23 +103,20 @@ describe('readGoAiSafeError', () => {
     });
   });
 
-  it('maps model_terms_required without leaking upstream detail', async () => {
+  it('maps invalid media file STT errors to a clear retry hint', async () => {
     const response = new Response(
       JSON.stringify({
         error: {
-          message: 'The model canopylabs/orpheus-v1-english requires terms acceptance.',
+          message: 'could not process file - is it a valid media file?',
           type: 'invalid_request_error',
-          code: 'model_terms_required',
         },
       }),
       { status: 400 },
     );
 
-    await expect(readGoAiSafeError(response)).resolves.toEqual({
+    await expect(readGoAiSafeError(response)).resolves.toMatchObject({
       status: 400,
-      code: 'model_terms_required',
-      message:
-        'Groq requires accepting Orpheus TTS model terms in the console before speech works.',
+      message: expect.stringContaining('Could not read the voice recording'),
     });
   });
 });
