@@ -19,7 +19,6 @@ import {
   deleteFamilyDateAction,
   loadFamilyDatesAction,
   type FamilyDateActionError,
-  type MemberBirthdayRecord,
 } from '@/features/family/date-actions';
 import { formatClientNowIso } from '@/features/calendar/calendar-time';
 import {
@@ -27,6 +26,7 @@ import {
   type FamilyDateKind,
   type FamilyDateRecord,
 } from '@/features/family/family-date-utils';
+import type { MemberBirthdayRecord } from '@/features/family/list-member-birthdays';
 import { HubToolbarIcon, HubToolbarLabel, hubToolbarTriggerClassName } from '@/features/family/hub-toolbar';
 import { formatMonthDay, formatIsoYmd } from '@/lib/format-date';
 import { cn } from '@/lib/utils';
