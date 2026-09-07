@@ -13,8 +13,10 @@ import {
 import { FamilyMemberAvatar } from '@/features/family/family-member-avatar';
 import {
   canChangeMemberRole,
+  canEditMemberCoreProfile,
   canEditMemberProfile,
   canRemoveMember,
+  canSetViewerKinship,
   canTransferOwnership,
 } from '@/features/family/profile-permissions';
 import {
@@ -65,19 +67,13 @@ export function MemberProfileSheet({
   const isEditing = editingMemberId === activeMember.id;
   const label = memberDisplayLabel(activeMember);
   const actor = { userId: currentUserId, familyRole: currentUserRole };
-  const canEdit = canEditMemberProfile(actor, {
-    id: activeMember.id,
-    familyRole: activeMember.familyRole,
-  });
+  const targetRef = { id: activeMember.id, familyRole: activeMember.familyRole };
+  const canEdit = canEditMemberProfile(actor, targetRef);
+  const canEditCore = canEditMemberCoreProfile(actor, targetRef);
+  const canEditKinship = canSetViewerKinship(actor, targetRef);
   const canEditRole = canChangeMemberRole(actor) && activeMember.familyRole !== 'owner';
-  const canTransfer = canTransferOwnership(actor, {
-    id: activeMember.id,
-    familyRole: activeMember.familyRole,
-  });
-  const canRemove = canRemoveMember(actor, {
-    id: activeMember.id,
-    familyRole: activeMember.familyRole,
-  });
+  const canTransfer = canTransferOwnership(actor, targetRef);
+  const canRemove = canRemoveMember(actor, targetRef);
   const age = ageFromBirthDate(activeMember.birthDate);
   const kinship = activeMember.kinshipLabel
     ? t(`kinship.${activeMember.kinshipLabel}` as 'kinship.mom')
@@ -88,10 +84,16 @@ export function MemberProfileSheet({
     startTransition(async () => {
       const result = await updateMemberProfile({
         memberId: activeMember.id,
-        displayName: String(formData.get('displayName') ?? ''),
-        kinshipLabel: String(formData.get('kinshipLabel') ?? '') as '' | KinshipOption,
-        profileSex: String(formData.get('profileSex') ?? 'unspecified') as 'female' | 'male' | 'unspecified',
-        birthDate: String(formData.get('birthDate') ?? ''),
+        displayName: canEditCore
+          ? String(formData.get('displayName') ?? '')
+          : undefined,
+        kinshipLabel: canEditKinship
+          ? (String(formData.get('kinshipLabel') ?? '') as '' | KinshipOption)
+          : undefined,
+        profileSex: canEditCore
+          ? (String(formData.get('profileSex') ?? 'unspecified') as 'female' | 'male' | 'unspecified')
+          : undefined,
+        birthDate: canEditCore ? String(formData.get('birthDate') ?? '') : undefined,
         familyRole: canEditRole
           ? (String(formData.get('familyRole') ?? '') as FamilyRole)
           : undefined,
@@ -132,20 +134,16 @@ export function MemberProfileSheet({
   }
 
   return (
-    <Sheet
-      open={open}
-      onOpenChange={(next) => {
-        if (!next) {
-          setEditingMemberId(null);
-          setErrorKey(null);
-        }
-        onOpenChange(next);
-      }}
-    >
+    <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="center" className="overflow-y-auto">
         <SheetHeader className="border-b border-border/60 pb-4">
-          <div className="flex items-center gap-4">
-            <FamilyMemberAvatar member={activeMember} size="2xl" showOwnerBadge />
+          <div className="flex items-center gap-3">
+            <FamilyMemberAvatar
+              member={activeMember}
+              size="xl"
+              showOwnerBadge
+              alt={t('memberAvatarAlt', { name: label })}
+            />
             <div className="min-w-0 space-y-1">
               <SheetTitle className="text-xl">{label}</SheetTitle>
               <SheetDescription className="text-sm">
@@ -164,10 +162,13 @@ export function MemberProfileSheet({
                 <dt className="text-muted-foreground">{t('displayNameLabel')}</dt>
                 <dd className="font-medium text-foreground">{label}</dd>
               </div>
-              <div>
-                <dt className="text-muted-foreground">{t('kinshipLabel')}</dt>
-                <dd className="font-medium text-foreground">{kinship ?? t('kinshipUnset')}</dd>
-              </div>
+              {!activeMember.isCurrentUser ? (
+                <div>
+                  <dt className="text-muted-foreground">{t('kinshipLabel')}</dt>
+                  <dd className="font-medium text-foreground">{kinship ?? t('kinshipUnset')}</dd>
+                  <p className="mt-1 text-xs text-muted-foreground">{t('kinshipHint')}</p>
+                </div>
+              ) : null}
               <div>
                 <dt className="text-muted-foreground">{t('emailLabel')}</dt>
                 <dd className="truncate font-medium text-foreground">{activeMember.email}</dd>
@@ -192,7 +193,7 @@ export function MemberProfileSheet({
                   setEditingMemberId(activeMember.id);
                 }}
               >
-                {t('editMember')}
+                {canEditCore ? t('editMember') : t('editKinship')}
               </Button>
             ) : null}
 
@@ -215,59 +216,68 @@ export function MemberProfileSheet({
               handleSubmit(new FormData(event.currentTarget));
             }}
           >
-            <div className="space-y-2">
-              <Label htmlFor="displayName">{t('displayNameLabel')}</Label>
-              <Input
-                id="displayName"
-                name="displayName"
-                defaultValue={activeMember.displayName ?? label}
-                maxLength={255}
-              />
-            </div>
+            {canEditCore ? (
+              <div className="space-y-2">
+                <Label htmlFor="displayName">{t('displayNameLabel')}</Label>
+                <Input
+                  id="displayName"
+                  name="displayName"
+                  defaultValue={activeMember.displayName ?? label}
+                  maxLength={255}
+                />
+              </div>
+            ) : null}
 
-            <div className="space-y-2">
-              <Label htmlFor="kinshipLabel">{t('kinshipLabel')}</Label>
-              <select
-                id="kinshipLabel"
-                name="kinshipLabel"
-                className={fieldClass}
-                defaultValue={activeMember.kinshipLabel ?? ''}
-              >
-                <option value="">{t('kinshipUnset')}</option>
-                {KINSHIP_OPTIONS.map((option) => (
-                  <option key={option} value={option}>
-                    {t(`kinship.${option}`)}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {canEditKinship ? (
+              <div className="space-y-2">
+                <Label htmlFor="kinshipLabel">{t('kinshipLabel')}</Label>
+                <select
+                  id="kinshipLabel"
+                  name="kinshipLabel"
+                  className={fieldClass}
+                  defaultValue={activeMember.kinshipLabel ?? ''}
+                >
+                  <option value="">{t('kinshipUnset')}</option>
+                  {KINSHIP_OPTIONS.map((option) => (
+                    <option key={option} value={option}>
+                      {t(`kinship.${option}`)}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-muted-foreground">{t('kinshipHint')}</p>
+              </div>
+            ) : null}
 
-            <div className="space-y-2">
-              <Label htmlFor="profileSex">{t('sexLabel')}</Label>
-              <select
-                id="profileSex"
-                name="profileSex"
-                className={fieldClass}
-                defaultValue={activeMember.profileSex}
-              >
-                <option value="unspecified">{t('sexUnspecified')}</option>
-                <option value="female">{t('sexFemale')}</option>
-                <option value="male">{t('sexMale')}</option>
-              </select>
-            </div>
+            {canEditCore ? (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="profileSex">{t('sexLabel')}</Label>
+                  <select
+                    id="profileSex"
+                    name="profileSex"
+                    className={fieldClass}
+                    defaultValue={activeMember.profileSex}
+                  >
+                    <option value="unspecified">{t('sexUnspecified')}</option>
+                    <option value="female">{t('sexFemale')}</option>
+                    <option value="male">{t('sexMale')}</option>
+                  </select>
+                </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="birthDate">{t('birthDateLabel')}</Label>
-              <Input
-                id="birthDate"
-                name="birthDate"
-                type="date"
-                defaultValue={activeMember.birthDate ?? ''}
-              />
-              {age !== null ? (
-                <p className="text-xs text-muted-foreground">{t('ageHint', { age })}</p>
-              ) : null}
-            </div>
+                <div className="space-y-2">
+                  <Label htmlFor="birthDate">{t('birthDateLabel')}</Label>
+                  <Input
+                    id="birthDate"
+                    name="birthDate"
+                    type="date"
+                    defaultValue={activeMember.birthDate ?? ''}
+                  />
+                  {age !== null ? (
+                    <p className="text-xs text-muted-foreground">{t('ageHint', { age })}</p>
+                  ) : null}
+                </div>
+              </>
+            ) : null}
 
             {canEditRole ? (
               <div className="space-y-2">

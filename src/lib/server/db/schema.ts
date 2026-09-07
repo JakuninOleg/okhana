@@ -31,7 +31,10 @@ export const users = pgTable('users', {
   displayName: varchar('display_name', { length: 255 }),
   birthDate: date('birth_date'),
   profileSex: profileSexEnum('profile_sex').default('unspecified').notNull(),
-  /** Social label: mom, dad, son, etc. Permissions stay in familyRole. */
+  /**
+   * Legacy shared kinship (pre viewer-specific). Prefer `member_kinship_views`.
+   * Kept for migration fallback / avatar sex heuristics when no view exists.
+   */
   kinshipLabel: varchar('kinship_label', { length: 64 }),
   /** Hex color for calendar chips, e.g. #E89B6C */
   profileColor: varchar('profile_color', { length: 7 }),
@@ -53,6 +56,23 @@ export const families = pgTable('families', {
   index('families_owner_id_idx').on(table.ownerId),
 ]);
 
+/**
+ * Viewer-specific kinship: how *I* address you (mom/dad/…).
+ * Not a shared family fact — each member keeps their own labels.
+ */
+export const memberKinshipViews = pgTable('member_kinship_views', {
+  id: serial('id').primaryKey(),
+  familyId: integer('family_id').notNull().references(() => families.id, { onDelete: 'cascade' }),
+  viewerUserId: integer('viewer_user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  subjectUserId: integer('subject_user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  kinshipLabel: varchar('kinship_label', { length: 64 }).notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex('member_kinship_viewer_subject_uidx').on(table.viewerUserId, table.subjectUserId),
+  index('member_kinship_family_idx').on(table.familyId),
+  index('member_kinship_viewer_idx').on(table.viewerUserId),
+]);
+
 // 3. notes (CORE PRODUCT — knowledge base)
 export const notes = pgTable('notes', {
   id: serial('id').primaryKey(),
@@ -63,6 +83,10 @@ export const notes = pgTable('notes', {
   privacyLevel: privacyLevelEnum('privacy_level').default('public').notNull(),
   hiddenFrom: integer('hidden_from').array(),
   category: noteCategoryEnum('category').default('general').notNull(),
+  /**
+   * Reserved for future client-side note encryption — unused in MVP.
+   * Do not drop on shared prod without a migration plan; app never sets true today.
+   */
   isEncrypted: boolean('is_encrypted').default(false).notNull(),
   iv: varchar('iv', { length: 255 }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
@@ -208,6 +232,22 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   taskAssignments: many(familyTaskAssignees),
   pushSubscriptions: many(pushSubscriptions),
   conversations: many(aiConversations),
+  kinshipViewsAsViewer: many(memberKinshipViews, { relationName: 'kinshipViewer' }),
+  kinshipViewsAsSubject: many(memberKinshipViews, { relationName: 'kinshipSubject' }),
+}));
+
+export const memberKinshipViewsRelations = relations(memberKinshipViews, ({ one }) => ({
+  family: one(families, { fields: [memberKinshipViews.familyId], references: [families.id] }),
+  viewer: one(users, {
+    fields: [memberKinshipViews.viewerUserId],
+    references: [users.id],
+    relationName: 'kinshipViewer',
+  }),
+  subject: one(users, {
+    fields: [memberKinshipViews.subjectUserId],
+    references: [users.id],
+    relationName: 'kinshipSubject',
+  }),
 }));
 
 export const familiesRelations = relations(families, ({ one, many }) => ({
@@ -219,6 +259,7 @@ export const familiesRelations = relations(families, ({ one, many }) => ({
   familyDates: many(familyDates),
   conversations: many(aiConversations),
   proactiveNudgeDeliveries: many(proactiveNudgeDeliveries),
+  kinshipViews: many(memberKinshipViews),
 }));
 
 export const familyDatesRelations = relations(familyDates, ({ one }) => ({

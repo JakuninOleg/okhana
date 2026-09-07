@@ -29,12 +29,14 @@ describe('buildSystemPrompt task vs fact routing', () => {
     timeZone: 'Europe/Moscow',
   };
 
-  it('includes device local time and family member ids', () => {
+  it('includes device local time and family member ids without emails', () => {
     const prompt = buildSystemPrompt(base);
     expect(prompt).toContain('2026-09-04T15:00:00+03:00');
     expect(prompt).toContain('Europe/Moscow');
     expect(prompt).toContain('1:Олег:husband:owner:');
     expect(prompt).toContain('2:Дарья:wife:adult:');
+    expect(prompt).not.toContain('oleg@example.com');
+    expect(prompt).not.toContain('darya@example.com');
   });
 
   it('steers facts to remember_note and actions to create_task', () => {

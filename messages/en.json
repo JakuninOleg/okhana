@@ -191,8 +191,15 @@
       "editMemberTitle": "Edit profile",
       "emailLabel": "Email",
       "displayNameLabel": "Display name",
-      "kinshipLabel": "Kinship",
+      "kinshipLabel": "How you call them",
+      "kinshipHint": "Visible only to you — others can set their own label for this person.",
       "kinshipUnset": "Not set",
+      "editKinship": "Set kinship",
+      "rotateInvite": "Rotate invite code",
+      "rotatingInvite": "Rotating…",
+      "leaveFamily": "Leave family",
+      "leavingFamily": "Leaving…",
+      "ownerLeaveHint": "Transfer ownership before leaving, or remove other members first.",
       "sexLabel": "Sex (optional)",
       "sexUnspecified": "Prefer not to say",
       "sexFemale": "Female",
@@ -226,7 +233,9 @@
         "forbidden": "You cannot edit this profile.",
         "cannot_change_owner_role": "Transfer ownership instead of changing the owner role.",
         "use_transfer_ownership": "Use “Make family owner” to transfer ownership.",
-        "db_unavailable": "Database is busy. Please try again."
+        "db_unavailable": "Database is busy. Please try again.",
+        "owner_must_transfer": "Transfer ownership before leaving the family.",
+        "rate_limited": "Too many attempts. Try again later."
       }
     },
     "notes": {
@@ -377,7 +386,17 @@
       "createSubmitting": "Creating…",
       "joinSubmit": "Join family",
       "joinSubmitting": "Joining…",
-      "back": "Back"
+      "back": "Back",
+      "errors": {
+        "not_authenticated": "Please sign in again.",
+        "family_name_required": "Enter a family name.",
+        "invite_code_required": "Enter an invite code.",
+        "user_not_found": "Could not load your account. Try again.",
+        "already_in_family": "You already belong to a family.",
+        "invalid_invite_code": "That invite code is not valid.",
+        "rate_limited": "Too many attempts. Try again later.",
+        "db_unavailable": "Database is busy. Please try again."
+      }
     },
     "voiceChat": {
       "assistantName": "Okhana",

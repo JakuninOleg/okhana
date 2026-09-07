@@ -43,6 +43,13 @@
       "when": 1788731741669,
       "tag": "0005_bright_lake",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1788860000000,
+      "tag": "0006_member_kinship_views",
+      "breakpoints": true
     }
   ]
 }

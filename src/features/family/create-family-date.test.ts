@@ -6,6 +6,15 @@ vi.mock('@/lib/server/db/client', () => ({
   withDbRetry: (operation: () => Promise<unknown>) => operation(),
 }));
 
+vi.mock('@/lib/server/family/assert-family-member', () => ({
+  loadActiveFamilyMember: vi.fn(async (userId: number, familyId?: number) => ({
+    userId,
+    clerkId: 'user_test',
+    familyId: familyId ?? 1,
+    familyRole: 'adult' as const,
+  })),
+}));
+
 vi.mock('@/lib/server/db', () => ({
   db: {
     insert: vi.fn(() => ({
