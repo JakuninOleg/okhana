@@ -10,14 +10,37 @@ export type FamilyMemberTarget = {
   familyRole: FamilyRole | null;
 };
 
-export function canEditMemberProfile(
+/**
+ * Core profile (display name, sex, birth date): self, or adult/owner managing a child.
+ * Adults do not rewrite other adults' shared identity — use viewer kinship instead.
+ */
+export function canEditMemberCoreProfile(
   actor: FamilyActor,
   target: FamilyMemberTarget,
 ): boolean {
   if (actor.userId === target.id) return true;
-  if (actor.familyRole === 'owner') return true;
-  if (actor.familyRole === 'adult') return true;
-  return false;
+  if (target.familyRole !== 'child') return false;
+  return actor.familyRole === 'owner' || actor.familyRole === 'adult';
+}
+
+/**
+ * Kinship is personal: any member may set how *they* address another member.
+ * Labels are viewer-specific and never overwrite someone else's view.
+ */
+export function canSetViewerKinship(
+  actor: FamilyActor,
+  target: FamilyMemberTarget,
+): boolean {
+  if (actor.userId === target.id) return false;
+  return target.familyRole != null;
+}
+
+/** Sheet "Edit" — core fields and/or personal kinship label. */
+export function canEditMemberProfile(
+  actor: FamilyActor,
+  target: FamilyMemberTarget,
+): boolean {
+  return canEditMemberCoreProfile(actor, target) || canSetViewerKinship(actor, target);
 }
 
 export function canChangeMemberRole(actor: FamilyActor): boolean {
@@ -42,4 +65,13 @@ export function canRemoveMember(
   if (actor.userId === target.id) return false;
   if (target.familyRole === 'owner' || target.familyRole == null) return false;
   return true;
+}
+
+/** Non-owner members may leave; owner must transfer first. */
+export function canLeaveFamily(actor: FamilyActor): boolean {
+  return actor.familyRole === 'adult' || actor.familyRole === 'child';
+}
+
+export function canRotateInviteCode(actor: FamilyActor): boolean {
+  return actor.familyRole === 'owner';
 }

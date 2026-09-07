@@ -11,10 +11,12 @@ import {
   setCachedChatContext,
   type CachedChatContext,
 } from '@/features/chat/chat-context-cache';
+import { listKinshipLabelsForViewer } from '@/features/family/member-kinship';
 import { routing, type Locale } from '@/i18n/routing';
 import { db } from '@/lib/server/db';
 import { withDbRetry } from '@/lib/server/db/client';
 import { aiChatMessages, aiConversations, users } from '@/lib/server/db/schema';
+import { consumeRateLimit } from '@/lib/server/rate-limit';
 
 export const runtime = 'nodejs';
 
@@ -81,7 +83,7 @@ async function loadChatContextFromDb(clerkUserId: string): Promise<ChatContextOk
       throw new Error(dbUser ? 'User does not belong to a family' : 'User not found');
     }
 
-    const familyMembers = await db
+    const familyMembersRaw = await db
       .select({
         id: users.id,
         name: users.displayName,
@@ -92,6 +94,16 @@ async function loadChatContextFromDb(clerkUserId: string): Promise<ChatContextOk
       })
       .from(users)
       .where(eq(users.familyId, dbUser.familyId));
+
+    const viewerKinship = await listKinshipLabelsForViewer({
+      familyId: dbUser.familyId,
+      viewerUserId: dbUser.id,
+    });
+
+    const familyMembers = familyMembersRaw.map((member) => ({
+      ...member,
+      kinshipLabel: viewerKinship.get(member.id) ?? null,
+    }));
 
     const [existingConversation] = await db
       .select()
@@ -191,6 +203,18 @@ export async function POST(request: Request): Promise<Response> {
   const { userId: clerkUserId } = await auth();
   if (!clerkUserId) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const rate = consumeRateLimit({
+    key: `chat:${clerkUserId}`,
+    limit: 40,
+    windowMs: 60_000,
+  });
+  if (!rate.ok) {
+    return Response.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rate.retryAfterSec) } },
+    );
   }
 
   try {

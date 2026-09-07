@@ -8,6 +8,7 @@ import {
   type DashboardFamilyData,
   type DashboardFamilyMember,
 } from '@/features/family/family-cache';
+import { listKinshipLabelsForViewer } from '@/features/family/member-kinship';
 import { db } from '@/lib/server/db';
 import { withDbRetry } from '@/lib/server/db/client';
 import { families, users } from '@/lib/server/db/schema';
@@ -110,9 +111,22 @@ async function queryDashboardFamily(clerkUserId: string): Promise<DashboardFamil
       .from(users)
       .where(eq(users.familyId, familyId));
 
+    // Kinship labels are personal to the viewing member — not a shared family field.
+    const viewerKinship = await listKinshipLabelsForViewer({
+      familyId,
+      viewerUserId: sync.id,
+    });
+
     const hasFamily = family != null;
     const members = memberRows
-      .map((row) => mapMemberRow(row, sync.id))
+      .map((row) =>
+        mapMemberRow(
+          {
+            ...row,
+            kinshipLabel: viewerKinship.get(row.id) ?? null,
+          },
+          sync.id,
+        ))
       .sort((a, b) => Number(b.isCurrentUser) - Number(a.isCurrentUser));
     const currentMember = members.find((member) => member.isCurrentUser);
     const userDisplayName = currentMember?.displayName

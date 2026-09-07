@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useTransition } from 'react';
 import { Settings2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import {
@@ -13,10 +13,12 @@ import { FamilyMemberAvatar } from '@/features/family/family-member-avatar';
 import { FamilyDatesSheet } from '@/features/family/family-dates-sheet';
 import { InviteCodeDisplay } from '@/features/family/invite-code-display';
 import { MemberProfileSheet } from '@/features/family/member-profile-sheet';
+import { leaveFamily, rotateInviteCode } from '@/features/family/actions';
 import { FamilyCalendarSheet } from '@/features/calendar/family-calendar-sheet';
 import { FamilyNotesSheet } from '@/features/notes/family-notes-sheet';
 import { HubToolbar, HubToolbarIcon, HubToolbarLabel, hubToolbarTriggerClassName } from '@/features/family/hub-toolbar';
 import { PushNotificationsSettings } from '@/features/notifications/push-notifications-settings';
+import { Button } from '@/components/ui/button';
 import {
   Sheet,
   SheetContent,
@@ -127,11 +129,35 @@ function MemberButton({
 function FamilySettingsSheet({
   familyName,
   inviteCode,
+  currentUserRole,
 }: {
   familyName: string;
   inviteCode: string;
+  currentUserRole: FamilyRole;
 }): React.JSX.Element {
   const t = useTranslations('Dashboard.familyHub');
+  const [errorKey, setErrorKey] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  function handleRotate(): void {
+    setErrorKey(null);
+    startTransition(async () => {
+      const result = await rotateInviteCode();
+      if (!result.ok) {
+        setErrorKey(result.error);
+      }
+    });
+  }
+
+  function handleLeave(): void {
+    setErrorKey(null);
+    startTransition(async () => {
+      const result = await leaveFamily();
+      if (!result.ok) {
+        setErrorKey(result.error);
+      }
+    });
+  }
 
   return (
     <Sheet>
@@ -155,6 +181,31 @@ function FamilySettingsSheet({
             <p className="text-sm text-muted-foreground">{t('inviteDescription')}</p>
           </div>
           <InviteCodeDisplay code={inviteCode} />
+          {currentUserRole === 'owner' ? (
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isPending}
+              onClick={handleRotate}
+            >
+              {isPending ? t('rotatingInvite') : t('rotateInvite')}
+            </Button>
+          ) : null}
+          {currentUserRole !== 'owner' ? (
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={isPending}
+              onClick={handleLeave}
+            >
+              {isPending ? t('leavingFamily') : t('leaveFamily')}
+            </Button>
+          ) : (
+            <p className="text-xs text-muted-foreground">{t('ownerLeaveHint')}</p>
+          )}
+          {errorKey ? (
+            <p className="text-sm text-destructive">{t(`errors.${errorKey}`)}</p>
+          ) : null}
           <PushNotificationsSettings />
         </div>
       </SheetContent>
@@ -193,7 +244,11 @@ export function FamilyHubMenu({
             <FamilyNotesSheet />
             <FamilyCalendarSheet />
             <FamilyDatesSheet />
-            <FamilySettingsSheet familyName={familyName} inviteCode={inviteCode} />
+            <FamilySettingsSheet
+              familyName={familyName}
+              inviteCode={inviteCode}
+              currentUserRole={currentUserRole}
+            />
           </HubToolbar>
         </div>
 
@@ -228,7 +283,11 @@ export function FamilyHubMenu({
               <FamilyNotesSheet />
               <FamilyCalendarSheet />
               <FamilyDatesSheet />
-              <FamilySettingsSheet familyName={familyName} inviteCode={inviteCode} />
+              <FamilySettingsSheet
+                familyName={familyName}
+                inviteCode={inviteCode}
+                currentUserRole={currentUserRole}
+              />
             </HubToolbar>
           </div>
           <ul className="-mx-0.5 flex gap-2 overflow-x-auto px-0.5 pb-1 snap-x snap-mandatory">

@@ -10,10 +10,12 @@ import {
   KINSHIP_OPTIONS,
   type FamilyRole,
 } from '@/features/family/family-member-types';
+import { upsertViewerKinship } from '@/features/family/member-kinship';
 import {
   canChangeMemberRole,
-  canEditMemberProfile,
+  canEditMemberCoreProfile,
   canRemoveMember,
+  canSetViewerKinship,
   canTransferOwnership,
 } from '@/features/family/profile-permissions';
 import { db } from '@/lib/server/db';
@@ -85,6 +87,7 @@ export async function updateMemberProfile(
       const [target] = await db
         .select({
           id: users.id,
+          clerkId: users.clerkId,
           familyId: users.familyId,
           familyRole: users.familyRole,
         })
@@ -96,23 +99,33 @@ export async function updateMemberProfile(
         return { ok: false, error: 'member_not_found' };
       }
 
-      if (!canEditMemberProfile(actor, { id: target.id, familyRole: target.familyRole })) {
+      const targetRef = { id: target.id, familyRole: target.familyRole };
+      const canCore = canEditMemberCoreProfile(actor, targetRef);
+      const canKinship = canSetViewerKinship(actor, targetRef);
+
+      if (!canCore && !canKinship && parsed.data.familyRole === undefined) {
         return { ok: false, error: 'forbidden' };
       }
 
       const patch: Partial<typeof users.$inferInsert> = {};
 
       if (parsed.data.displayName !== undefined) {
+        if (!canCore) {
+          return { ok: false, error: 'forbidden' };
+        }
         const trimmed = parsed.data.displayName.trim();
         patch.displayName = trimmed.length > 0 ? trimmed : null;
       }
-      if (parsed.data.kinshipLabel !== undefined) {
-        patch.kinshipLabel = parsed.data.kinshipLabel === '' ? null : parsed.data.kinshipLabel;
-      }
       if (parsed.data.profileSex !== undefined) {
+        if (!canCore) {
+          return { ok: false, error: 'forbidden' };
+        }
         patch.profileSex = parsed.data.profileSex;
       }
       if (parsed.data.birthDate !== undefined) {
+        if (!canCore) {
+          return { ok: false, error: 'forbidden' };
+        }
         patch.birthDate = parsed.data.birthDate === '' ? null : parsed.data.birthDate;
       }
       if (parsed.data.familyRole !== undefined) {
@@ -128,12 +141,33 @@ export async function updateMemberProfile(
         patch.familyRole = parsed.data.familyRole;
       }
 
-      if (Object.keys(patch).length === 0) {
+      if (parsed.data.kinshipLabel !== undefined) {
+        if (!canKinship) {
+          return { ok: false, error: 'forbidden' };
+        }
+        const kinshipResult = await upsertViewerKinship({
+          familyId: actor.familyId,
+          viewerUserId: actor.userId,
+          subjectUserId: target.id,
+          kinshipLabel: parsed.data.kinshipLabel === '' ? null : parsed.data.kinshipLabel,
+        });
+        if (!kinshipResult.ok) {
+          return { ok: false, error: kinshipResult.error };
+        }
+      }
+
+      if (Object.keys(patch).length > 0) {
+        await db.update(users).set(patch).where(eq(users.id, target.id));
+      } else if (parsed.data.kinshipLabel === undefined) {
         return { ok: true };
       }
 
-      await db.update(users).set(patch).where(eq(users.id, target.id));
-      revalidateFamilyDashboard(clerkUserId);
+      // Role demotion/promotion must drop the target's cached tool context (stale role).
+      const invalidateTarget = patch.familyRole !== undefined;
+      revalidateFamilyDashboard(
+        clerkUserId,
+        invalidateTarget ? [target.clerkId] : [],
+      );
       return { ok: true };
     });
   } catch (error) {
@@ -182,11 +216,18 @@ export async function transferFamilyOwnership(
         return { ok: false, error: 'forbidden' };
       }
 
-      await db.transaction(async (tx) => {
-        await tx
+      const transferred = await db.transaction(async (tx) => {
+        // CAS: only succeed if this actor is still the family owner.
+        const [familyRow] = await tx
           .update(families)
           .set({ ownerId: target.id })
-          .where(eq(families.id, actor.familyId));
+          .where(and(eq(families.id, actor.familyId), eq(families.ownerId, actor.userId)))
+          .returning({ id: families.id });
+
+        if (!familyRow) {
+          return false;
+        }
+
         await tx
           .update(users)
           .set({ familyRole: 'adult' })
@@ -195,7 +236,12 @@ export async function transferFamilyOwnership(
           .update(users)
           .set({ familyRole: 'owner' })
           .where(eq(users.id, target.id));
+        return true;
       });
+
+      if (!transferred) {
+        return { ok: false, error: 'forbidden' };
+      }
 
       revalidateFamilyDashboard(clerkUserId, [target.clerkId]);
       return { ok: true };

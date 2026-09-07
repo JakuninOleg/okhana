@@ -1,3 +1,4 @@
+import { loadActiveFamilyMember } from '@/lib/server/family/assert-family-member';
 import { db } from '@/lib/server/db';
 import { withDbRetry } from '@/lib/server/db/client';
 import { notes } from '@/lib/server/db/schema';
@@ -16,9 +17,14 @@ type SaveNoteInput = {
 };
 
 export async function saveNote(input: SaveNoteInput): Promise<void> {
+  const member = await loadActiveFamilyMember(input.createdBy, input.familyId);
+  if (!member) {
+    throw new Error('Creator is not in this family');
+  }
+
   await withDbRetry(async () => {
     await db.insert(notes).values({
-      familyId: input.familyId,
+      familyId: member.familyId,
       createdBy: input.createdBy,
       title: input.title,
       content: input.content,

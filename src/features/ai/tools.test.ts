@@ -15,6 +15,22 @@ const mockListEventsInRange = vi.hoisted(() => vi.fn());
 const mockCreateFamilyDate = vi.hoisted(() => vi.fn());
 const mockListFamilyDates = vi.hoisted(() => vi.fn());
 const mockListMemberBirthdays = vi.hoisted(() => vi.fn());
+const mockLoadActiveFamilyMember = vi.hoisted(() =>
+  vi.fn(async (
+    userId: number,
+    familyId?: number,
+  ): Promise<{
+    userId: number;
+    clerkId: string;
+    familyId: number;
+    familyRole: 'owner' | 'adult' | 'child';
+  }> => ({
+    userId,
+    clerkId: 'user_test',
+    familyId: familyId ?? 1,
+    familyRole: 'owner',
+  })),
+);
 
 vi.mock('@/features/notes/save-note', () => ({
   saveNote: (...args: unknown[]) => mockSaveNote(...args),
@@ -66,6 +82,13 @@ vi.mock('@/features/tasks/update-assignment', () => ({
   completeTaskAssignment: (...args: unknown[]) => mockComplete(...args),
 }));
 
+vi.mock('@/lib/server/family/assert-family-member', () => ({
+  loadActiveFamilyMember: (
+    userId: number,
+    familyId?: number,
+  ) => mockLoadActiveFamilyMember(userId, familyId),
+}));
+
 describe('AI tools', () => {
   beforeEach(() => {
     mockSaveNote.mockReset();
@@ -81,6 +104,13 @@ describe('AI tools', () => {
     mockCreateFamilyDate.mockReset();
     mockListFamilyDates.mockReset();
     mockListMemberBirthdays.mockReset();
+    mockLoadActiveFamilyMember.mockReset();
+    mockLoadActiveFamilyMember.mockImplementation(async (userId: number, familyId?: number) => ({
+      userId,
+      clerkId: 'user_test',
+      familyId: familyId ?? 1,
+      familyRole: 'owner' as 'owner' | 'adult' | 'child',
+    }));
   });
 
   it('exposes OpenAI-compatible tool definitions for Go-Ai', () => {
@@ -135,6 +165,12 @@ describe('AI tools', () => {
 
   it('executes search_notes with the caller permission context', async () => {
     mockSearchNotes.mockResolvedValue([{ id: 1, title: 'Milk' }]);
+    mockLoadActiveFamilyMember.mockResolvedValueOnce({
+      userId: 8,
+      clerkId: 'user_test',
+      familyId: 4,
+      familyRole: 'child',
+    });
 
     await expect(
       executeAiTool(
@@ -421,6 +457,13 @@ describe('AI tools', () => {
   });
 
   it('rejects create_memorable_date for children', async () => {
+    mockLoadActiveFamilyMember.mockResolvedValueOnce({
+      userId: 4,
+      clerkId: 'user_test',
+      familyId: 1,
+      familyRole: 'child',
+    });
+
     await expect(
       executeAiTool(
         { familyId: 1, userId: 4, familyRole: 'child' },

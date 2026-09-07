@@ -18,6 +18,13 @@ vi.mock('@/features/family/family-cache', () => ({
     mockInvalidateDashboardFamilyCache(...args),
 }));
 
+const mockInvalidateCachedChatContext = vi.hoisted(() => vi.fn());
+
+vi.mock('@/features/chat/chat-context-cache', () => ({
+  invalidateCachedChatContext: (...args: unknown[]) =>
+    mockInvalidateCachedChatContext(...args),
+}));
+
 vi.mock('@/lib/server/db/schema', () => ({
   users: {
     id: 'id',
@@ -102,7 +109,10 @@ describe('ensureDbUser', () => {
       .mockResolvedValueOnce([]);
 
     mockClerkGetUser.mockResolvedValue({
-      emailAddresses: [{ emailAddress: 'oleg@example.com' }],
+      emailAddresses: [{
+        emailAddress: 'oleg@example.com',
+        verification: { status: 'verified' },
+      }],
       firstName: 'Oleg',
       lastName: null,
       imageUrl: 'https://img.example/avatar.png',
@@ -121,6 +131,34 @@ describe('ensureDbUser', () => {
     await expect(ensureDbUser('user_new')).resolves.toEqual(linked);
     expect(mockInvalidateDashboardFamilyCache).toHaveBeenCalledWith('user_new');
     expect(mockInvalidateDashboardFamilyCache).toHaveBeenCalledWith('user_old');
+    expect(mockInvalidateCachedChatContext).toHaveBeenCalledWith('user_new');
+    expect(mockInvalidateCachedChatContext).toHaveBeenCalledWith('user_old');
+  });
+
+  it('refuses email re-link when Clerk email is not verified', async () => {
+    mockSelectLimit
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{
+        id: 1,
+        clerkId: 'user_old',
+        email: 'oleg@example.com',
+        familyId: 1,
+        familyRole: 'owner',
+      }]);
+
+    mockClerkGetUser.mockResolvedValue({
+      emailAddresses: [{
+        emailAddress: 'oleg@example.com',
+        verification: { status: 'unverified' },
+      }],
+      firstName: 'Oleg',
+      lastName: null,
+      imageUrl: null,
+    });
+
+    const { ensureDbUser } = await import('./ensure-db-user');
+    await expect(ensureDbUser('user_new')).resolves.toBeNull();
+    expect(mockUpdateReturning).not.toHaveBeenCalled();
   });
 
   it('creates a new user when neither clerk id nor email exists', async () => {

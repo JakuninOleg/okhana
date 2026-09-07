@@ -1,5 +1,6 @@
 import { clerkClient } from '@clerk/nextjs/server';
 import { and, eq, ne } from 'drizzle-orm';
+import { invalidateCachedChatContext } from '@/features/chat/chat-context-cache';
 import { invalidateDashboardFamilyCache } from '@/features/family/family-cache';
 import { withDbRetry } from '@/lib/server/db/client';
 import { db } from '@/lib/server/db';
@@ -8,9 +9,35 @@ import { users } from '@/lib/server/db/schema';
 export type DbUser = typeof users.$inferSelect;
 
 function primaryEmail(clerkUser: {
-  emailAddresses: { emailAddress: string }[];
+  emailAddresses: Array<{
+    id?: string;
+    emailAddress: string;
+    verification?: { status: string | null } | null;
+  }>;
+  primaryEmailAddressId?: string | null;
 }): string {
+  if (clerkUser.primaryEmailAddressId) {
+    const primary = clerkUser.emailAddresses.find(
+      (entry) => entry.id === clerkUser.primaryEmailAddressId,
+    );
+    if (primary?.emailAddress) {
+      return primary.emailAddress;
+    }
+  }
   return clerkUser.emailAddresses[0]?.emailAddress ?? '';
+}
+
+function isEmailVerified(
+  clerkUser: {
+    emailAddresses: Array<{
+      emailAddress: string;
+      verification?: { status: string | null } | null;
+    }>;
+  },
+  email: string,
+): boolean {
+  const match = clerkUser.emailAddresses.find((entry) => entry.emailAddress === email);
+  return match?.verification?.status === 'verified';
 }
 
 function displayName(clerkUser: {
@@ -115,6 +142,15 @@ export async function ensureDbUser(clerkUserId: string): Promise<DbUser | null> 
       .limit(1);
 
     if (existingByEmail) {
+      // Re-linking inherits familyId — only allow when Clerk email is verified.
+      if (!isEmailVerified(clerkUser, email)) {
+        console.warn('ensureDbUser: refusing email re-link for unverified address', {
+          email,
+          clerkUserId,
+        });
+        return null;
+      }
+
       await clearOrphanClerkStub(clerkUserId, existingByEmail.id);
 
       let linked: DbUser | undefined;
@@ -130,6 +166,8 @@ export async function ensureDbUser(clerkUserId: string): Promise<DbUser | null> 
           if (byClerk) {
             invalidateDashboardFamilyCache(clerkUserId);
             invalidateDashboardFamilyCache(existingByEmail.clerkId);
+            invalidateCachedChatContext(clerkUserId);
+            invalidateCachedChatContext(existingByEmail.clerkId);
             return byClerk;
           }
         }
@@ -149,6 +187,8 @@ export async function ensureDbUser(clerkUserId: string): Promise<DbUser | null> 
 
       invalidateDashboardFamilyCache(clerkUserId);
       invalidateDashboardFamilyCache(existingByEmail.clerkId);
+      invalidateCachedChatContext(clerkUserId);
+      invalidateCachedChatContext(existingByEmail.clerkId);
 
       return linked;
     }

@@ -17,24 +17,22 @@ async function createFamilyAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  try {
-    await createFamily(formData);
-    return null;
-  } catch (e) {
-    return { error: e instanceof Error ? e.message : 'error' };
+  const result = await createFamily(formData);
+  if (!result.ok) {
+    return { error: result.error };
   }
+  return null;
 }
 
 async function joinFamilyAction(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  try {
-    await joinFamily(formData);
-    return null;
-  } catch (e) {
-    return { error: e instanceof Error ? e.message : 'error' };
+  const result = await joinFamily(formData);
+  if (!result.ok) {
+    return { error: result.error };
   }
+  return null;
 }
 
 type FamilySetupFormProps = {
@@ -135,7 +133,7 @@ export function FamilySetupForm({ className }: FamilySetupFormProps): React.JSX.
             </div>
             {createState?.error ? (
               <p className="text-sm text-destructive" role="alert">
-                {createState.error}
+                {t(`errors.${createState.error}` as 'errors.not_authenticated')}
               </p>
             ) : null}
             <Button type="submit" disabled={isCreating} className="h-11 w-full">
@@ -161,7 +159,7 @@ export function FamilySetupForm({ className }: FamilySetupFormProps): React.JSX.
             </div>
             {joinState?.error ? (
               <p className="text-sm text-destructive" role="alert">
-                {joinState.error}
+                {t(`errors.${joinState.error}` as 'errors.not_authenticated')}
               </p>
             ) : null}
             <Button type="submit" disabled={isJoining} className="h-11 w-full">
