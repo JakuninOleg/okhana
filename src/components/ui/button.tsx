@@ -9,6 +9,9 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default: "bg-primary text-primary-foreground hover:bg-primary/80",
+        /** Warm accent in light; cream-on-ink in dark (peach+pale text fails contrast). */
+        cta:
+          "bg-brand-peach text-brand-teal shadow-sm hover:bg-[color-mix(in_oklab,var(--brand-peach),white_14%)] focus-visible:border-brand-peach/50 focus-visible:ring-brand-peach/35 dark:bg-brand-cream dark:text-[#0f1c1b] dark:hover:bg-white dark:focus-visible:border-brand-cream/40 dark:focus-visible:ring-brand-cream/25",
         outline:
           "border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50",
         secondary:

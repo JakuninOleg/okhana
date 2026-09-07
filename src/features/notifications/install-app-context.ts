@@ -63,7 +63,12 @@ export function shouldOfferInstallWizard(input: {
   nowMs: number;
   standalone: boolean;
   pushReady: boolean;
+  /** Phone-only: desktop users get push controls in family settings instead. */
+  platform: InstallPlatform;
 }): boolean {
+  if (input.platform === 'desktop') {
+    return false;
+  }
   if (
     input.dismissedAt !== null
     && input.nowMs - input.dismissedAt < INSTALL_WIZARD_SNOOZE_MS

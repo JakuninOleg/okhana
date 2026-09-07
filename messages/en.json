@@ -1,17 +1,152 @@
 {
   "Meta": {
     "title": "Okhana — Family. Together. Always.",
-    "description": "Okhana is an AI-powered family hub: shared notes, reminders, and a private assistant that only sees what each person is allowed to see.",
-    "ogTitle": "Okhana — Family hub with AI",
-    "ogDescription": "Family. Together. Always. Keep your household in sync with a privacy-first AI assistant."
+    "description": "A family app for shared tasks with notifications, notes, a calendar, and birthdays — with private notes that stay private.",
+    "ogTitle": "Okhana — for your family",
+    "ogDescription": "Family. Together. Always. Tasks, notes, and important dates — without the group-chat chaos."
   },
   "Home": {
     "brand": "Okhana",
     "tagline": "Family. Together. Always.",
-    "headline": "Your family hub, guided by AI",
-    "pitch": "Shared notes, reminders, and an assistant that only sees what each person is allowed to see — privacy at the source, not in the prompt.",
+    "headline": "Family life — without the endless group chat",
+    "pitch": "Tell Okhana: “remind Dad to pick up Sofia.” He gets a notification. Notes, birthdays, and who’s doing what live in one app. What isn’t for everyone stays out of sight.",
     "signIn": "Sign in",
-    "signUp": "Create account"
+    "signUp": "Create account",
+    "ctaPrimary": "Try it free",
+    "problem": {
+      "title": "Usually one person keeps it all in their head",
+      "body": "School pickup, milk, Grandpa’s birthday — then another reminder in WhatsApp that everyone scrolls past. Okhana puts it in one place: write what needs doing, and the right person hears about it."
+    },
+    "features": {
+      "title": "Write the way you already talk",
+      "subtitle": "Text or voice — no maze of menus. After you sign up, you’ll see this same screen.",
+      "chat": {
+        "eyebrow": "Chat & voice",
+        "title": "Plain words, like messaging family",
+        "body": "“Remind Mom to call the school.” “Remember Sofia is allergic to peanuts.” “What’s on this week?” Okhana answers and can create the task or note right away. Hands full? Hold the mic."
+      }
+    },
+    "wins": {
+      "title": "What Okhana helps with day to day",
+      "subtitle": "The whole family sees what’s shared. Private stays private — for the people you choose.",
+      "tasks": {
+        "eyebrow": "Tasks",
+        "title": "Ask someone — their phone gets a notification",
+        "body": "Say “remind Dad…” or pick a person. They get notified, mark it done, and you stop chasing the group thread."
+      },
+      "notes": {
+        "eyebrow": "Notes",
+        "title": "Save what matters. Hide what should stay quiet",
+        "body": "Allergy info can be for everyone. A gift plan for Dad can be hidden from him. Kids and adults see what you allow."
+      },
+      "calendar": {
+        "eyebrow": "Calendar",
+        "title": "Birthdays and events — with reminders in advance",
+        "body": "A shared calendar and memorable dates. Reminders a week, three days, or a day ahead. Morning and evening — a short list on your phone."
+      },
+      "phone": {
+        "eyebrow": "On your phone",
+        "title": "An icon on your home screen, like any other app",
+        "body": "Add Okhana to your home screen and turn on notifications — so you’re not digging through browser tabs."
+      }
+    },
+    "privacy": {
+      "title": "A surprise stays a surprise",
+      "body": "Planning a gift for Dad? Kids shouldn’t see that note — and Okhana shouldn’t spill it if Dad asks “what’s new?” Each person only sees what they’re allowed to.",
+      "step1Title": "You write as yourself",
+      "step1Body": "Okhana knows which family member is in the chat.",
+      "step2Title": "Other people’s stuff stays hidden",
+      "step2Body": "Private notes and “adults only” content don’t reach everyone else.",
+      "step3Title": "Answers only from what you can see",
+      "step3Body": "Okhana only uses the notes and facts you’re allowed to see."
+    },
+    "steps": {
+      "title": "How to start",
+      "one": {
+        "title": "Create your family",
+        "body": "Sign up, choose a name, and get an invite code."
+      },
+      "two": {
+        "title": "Invite the people you live with",
+        "body": "Partner and kids join with the code. Roles: owner, adult, or child."
+      },
+      "three": {
+        "title": "Message Okhana",
+        "body": "Ask for a reminder, save a note, or check the week. It builds up as you use it."
+      }
+    },
+    "closing": {
+      "title": "You can start today",
+      "body": "Set up the family once. After that, just message Okhana when you need to."
+    },
+    "demo": {
+      "familyName": "The Morales family",
+      "inviteCode": "Invite · K7M2",
+      "chipTasks": "Tasks",
+      "chipDates": "Dates",
+      "tasksSubtitle": "Due soon — same as in the app",
+      "task1Title": "Pick up Sofia from practice",
+      "task1Meta": "Today, 6:30 PM · For Dad · Open",
+      "task2Title": "Buy birthday candles",
+      "task2Meta": "Tomorrow · You created · Open",
+      "task3Title": "Call the dentist",
+      "task3Meta": "Fri · For Mom · Open",
+      "tasksHint": "Dad gets a notification when you assign him a task.",
+      "chatStatus": "Ready",
+      "chatUser1": "Remind Dad to pick up Sofia at 6:30",
+      "chatAssistant1": "Done — I created a task for Marco: pick up Sofia at 6:30. He’ll get a notification.",
+      "chatUser2": "What’s on for me today?",
+      "chatAssistant2": "You have “Buy birthday candles” due tomorrow. Marco still has pickup at 6:30.",
+      "composerPlaceholder": "Message Okhana…",
+      "noteSharedLabel": "Everyone can see",
+      "noteSharedTitle": "Sofia’s peanut allergy",
+      "noteSharedBody": "Always check labels. EpiPen in the kitchen drawer.",
+      "noteSharedMeta": "Shared with the whole family",
+      "notePrivateLabel": "Hidden from Dad",
+      "notePrivateTitle": "Dad’s anniversary gift — camera",
+      "notePrivateBody": "Order by Thursday. Hide the receipt in the desk.",
+      "notePrivateMeta": "Only Mom · Okhana won’t mention this to Dad",
+      "calendarTitle": "This month",
+      "calendarSubtitle": "Birthdays and family dates",
+      "date1Title": "Sofia’s birthday",
+      "date1Meta": "In 7 days · Reminder on",
+      "date2Title": "Anniversary dinner",
+      "date2Meta": "Sat · Family event",
+      "nudgeChip": "Reminder: Sofia’s birthday in 7 days",
+      "digestChip": "This morning · 2 open tasks",
+      "phoneTitle": "On your phone",
+      "phoneBody": "Home screen icon and notifications",
+      "phoneChip": "Add to Home Screen",
+      "members": {
+        "mom": {
+          "name": "Anna"
+        },
+        "dad": {
+          "name": "Marco"
+        },
+        "daughter": {
+          "name": "Sofia"
+        }
+      }
+    },
+    "heroPromptLead": "Write to Okhana like a person:",
+    "heroPromptExample": "“Remind Dad to pick up Sofia at 6:30”",
+    "heroPromptHint": "Okhana figures out who to notify and when.",
+    "pitchShort": "Okhana helps remember the things you usually have to remind each other about.",
+    "problemCaption": "Less worrying. More time for what matters.",
+    "winsEyebrow": "Day to day",
+    "winsAside": "Important things don’t get lost. They just stay close.",
+    "winsPrivacy": {
+      "eyebrow": "Privacy",
+      "title": "Personal stays personal",
+      "body": "Not everything Okhana knows should be family-wide. Private notes and tasks stay with the people you trust."
+    },
+    "compare": {
+      "v1": "Version 1",
+      "v2": "Version 2",
+      "label": "Compare layouts"
+    },
+    "giftTag": "All according to plan"
   },
   "Navbar": {
     "signIn": "Sign in",
@@ -201,22 +336,24 @@
     },
     "installWizard": {
       "title": "Put Okhana on your phone",
-      "subtitle": "Add the icon and turn on alerts so birthdays, dates, and tasks reach you — like a normal app, without the App Store.",
+      "subtitle": "So birthday and task reminders reach you like a normal app — with a home-screen icon and notifications.",
       "installTitle": "Home screen icon",
       "installDone": "Okhana is already running as an app on this device.",
       "installHint": {
-        "ios": "Takes about 15 seconds in Safari.",
-        "android": "Takes about 15 seconds in Chrome.",
-        "desktop": "You can still enable alerts here. On a phone, add the icon for the best experience."
+        "ios": "On iPhone this takes about a minute in Safari.",
+        "android": "In Chrome you can install it in a couple of taps.",
+        "desktop": "Best on a phone. You can still add a shortcut on this computer."
       },
-      "iosStep1": "Open this page in Safari (not in-app browsers).",
+      "iosStep1": "Open this page in Safari (not an in-app browser from a messenger).",
       "iosStep2Before": "Tap Share",
       "iosStep2After": ", then “Add to Home Screen”.",
-      "iosStep3": "Confirm Add — Okhana appears on your home screen.",
+      "iosStep3": "Confirm — Okhana appears on your home screen.",
       "androidStep1": "Open the Chrome menu (⋮).",
       "androidStep2": "Tap “Install app” or “Add to Home screen”.",
+      "desktopStep1": "In Chrome or Edge, click the install icon in the address bar (or the ⋮ menu).",
+      "desktopStep2": "Choose “Install Okhana” or “Install app”.",
       "installButton": "Install Okhana",
-      "pushWhy": "Without alerts, reminders for birthdays and tasks stay inside the browser tab.",
+      "pushWhy": "Without notifications, reminders stay only inside the browser tab.",
       "later": "Not now"
     },
     "onboarding": {
