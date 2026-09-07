@@ -4,7 +4,10 @@ const mockAuth = vi.hoisted(() => vi.fn());
 const mockEnsureDbUser = vi.hoisted(() => vi.fn());
 const mockListVisibleNotes = vi.hoisted(() => vi.fn());
 const mockDeleteVisibleNote = vi.hoisted(() => vi.fn());
+const mockUpdateVisibleNotePrivacy = vi.hoisted(() => vi.fn());
 const mockRevalidatePath = vi.hoisted(() => vi.fn());
+const mockSelectWhere = vi.hoisted(() => vi.fn());
+const mockSelectFrom = vi.hoisted(() => vi.fn());
 
 vi.mock('@clerk/nextjs/server', () => ({
   auth: () => mockAuth(),
@@ -17,6 +20,33 @@ vi.mock('@/lib/server/users/ensure-db-user', () => ({
 vi.mock('@/features/notes/list-notes', () => ({
   listVisibleNotes: (...args: unknown[]) => mockListVisibleNotes(...args),
   deleteVisibleNote: (...args: unknown[]) => mockDeleteVisibleNote(...args),
+  updateVisibleNotePrivacy: (...args: unknown[]) => mockUpdateVisibleNotePrivacy(...args),
+}));
+
+vi.mock('@/lib/server/db/client', () => ({
+  withDbRetry: (operation: () => Promise<unknown>) => operation(),
+}));
+
+vi.mock('@/lib/server/db', () => ({
+  db: {
+    select: vi.fn(() => ({
+      from: (...args: unknown[]) => mockSelectFrom(...args),
+    })),
+  },
+}));
+
+vi.mock('@/lib/server/db/schema', () => ({
+  users: {
+    id: 'id',
+    email: 'email',
+    name: 'name',
+    displayName: 'display_name',
+    familyId: 'family_id',
+  },
+}));
+
+vi.mock('drizzle-orm', () => ({
+  eq: vi.fn((...args: unknown[]) => args),
 }));
 
 vi.mock('next/cache', () => ({
@@ -29,7 +59,12 @@ describe('note actions', () => {
     mockEnsureDbUser.mockReset();
     mockListVisibleNotes.mockReset();
     mockDeleteVisibleNote.mockReset();
+    mockUpdateVisibleNotePrivacy.mockReset();
     mockRevalidatePath.mockReset();
+    mockSelectWhere.mockReset();
+    mockSelectFrom.mockReset();
+    mockSelectWhere.mockResolvedValue([]);
+    mockSelectFrom.mockReturnValue({ where: mockSelectWhere });
   });
 
   it('loadVisibleNotesAction returns unauthorized without clerk session', async () => {
@@ -45,6 +80,10 @@ describe('note actions', () => {
     mockAuth.mockResolvedValue({ userId: 'clerk_1' });
     mockEnsureDbUser.mockResolvedValue({ id: 2, familyId: 9, familyRole: 'adult' });
     mockListVisibleNotes.mockResolvedValue([{ id: 1, title: 'Milk' }]);
+    mockSelectWhere.mockResolvedValue([
+      { id: 2, email: 'a@x', name: 'A', displayName: 'Me' },
+      { id: 3, email: 'b@x', name: 'B', displayName: 'Mom' },
+    ]);
 
     const { loadVisibleNotesAction } = await import('./note-actions');
     await expect(loadVisibleNotesAction()).resolves.toEqual({
@@ -52,6 +91,7 @@ describe('note actions', () => {
       notes: [{ id: 1, title: 'Milk' }],
       currentUserId: 2,
       familyRole: 'adult',
+      members: [{ id: 3, label: 'Mom' }],
     });
   });
 

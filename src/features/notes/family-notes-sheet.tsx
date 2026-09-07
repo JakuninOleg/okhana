@@ -17,33 +17,55 @@ import { HubToolbarIcon, HubToolbarLabel, hubToolbarTriggerClassName } from '@/f
 import {
   deleteNoteAction,
   loadVisibleNotesAction,
+  updateNotePrivacyAction,
   type NoteActionError,
+  type NoteMemberOption,
 } from '@/features/notes/note-actions';
 import type { VisibleNote } from '@/features/notes/list-notes';
 import { formatDateTimeMedium } from '@/lib/format-date';
+import { cn } from '@/lib/utils';
 
 function formatCreatedAt(value: Date, locale: string): string {
   return formatDateTimeMedium(value, locale);
 }
 
+type PrivacyLevel = VisibleNote['privacyLevel'];
+
 function NoteRow({
   note,
-  canDelete,
+  canManage,
+  members,
   pending,
   onDelete,
+  onSavePrivacy,
 }: {
   note: VisibleNote;
-  canDelete: boolean;
+  canManage: boolean;
+  members: NoteMemberOption[];
   pending: boolean;
   onDelete: (id: number) => void;
+  onSavePrivacy: (input: {
+    noteId: number;
+    privacyLevel: PrivacyLevel;
+    hiddenFrom: number[];
+  }) => void;
 }): React.JSX.Element {
   const t = useTranslations('Dashboard.notes');
   const locale = useLocale();
+  const [privacyLevel, setPrivacyLevel] = useState<PrivacyLevel>(note.privacyLevel);
+  const [hiddenFrom, setHiddenFrom] = useState<number[]>(note.hiddenFrom ?? []);
+  const [editing, setEditing] = useState(false);
+
+  function toggleHidden(memberId: number): void {
+    setHiddenFrom((prev) =>
+      prev.includes(memberId) ? prev.filter((id) => id !== memberId) : [...prev, memberId],
+    );
+  }
 
   return (
     <li className="rounded-2xl border border-border/60 bg-background/70 px-3 py-3">
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 space-y-1">
+        <div className="min-w-0 flex-1 space-y-1">
           <p className="text-sm font-medium text-foreground">{note.title}</p>
           <p className="text-sm whitespace-pre-wrap text-muted-foreground">{note.content}</p>
           <p className="text-xs text-muted-foreground">
@@ -54,19 +76,94 @@ function NoteRow({
             ].join(' · ')}
           </p>
         </div>
-        {canDelete ? (
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          {canManage ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              disabled={pending}
+              onClick={() => setEditing((value) => !value)}
+            >
+              {editing ? t('privacyCancel') : t('privacyEdit')}
+            </Button>
+          ) : null}
+          {canManage ? (
+            <Button
+              type="button"
+              size="icon-sm"
+              variant="ghost"
+              disabled={pending}
+              aria-label={t('delete')}
+              onClick={() => onDelete(note.id)}
+            >
+              <Trash2 className="size-3.5" />
+            </Button>
+          ) : null}
+        </div>
+      </div>
+
+      {editing && canManage ? (
+        <div className="mt-3 space-y-3 border-t border-border/50 pt-3">
+          <p className="text-xs font-medium text-foreground">{t('privacyLabel')}</p>
+          <div className="flex flex-wrap gap-2">
+            {(['public', 'adults_only', 'personal'] as const).map((level) => (
+              <Button
+                key={level}
+                type="button"
+                size="sm"
+                variant={privacyLevel === level ? 'default' : 'outline'}
+                className={cn(privacyLevel === level && 'pointer-events-none')}
+                onClick={() => {
+                  setPrivacyLevel(level);
+                  if (level === 'personal') {
+                    setHiddenFrom([]);
+                  }
+                }}
+              >
+                {t(`privacy.${level}`)}
+              </Button>
+            ))}
+          </div>
+          {privacyLevel !== 'personal' && members.length > 0 ? (
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">{t('hideFromLabel')}</p>
+              <div className="flex flex-wrap gap-2">
+                {members.map((member) => {
+                  const active = hiddenFrom.includes(member.id);
+                  return (
+                    <Button
+                      key={member.id}
+                      type="button"
+                      size="sm"
+                      variant={active ? 'default' : 'outline'}
+                      onClick={() => toggleHidden(member.id)}
+                    >
+                      {member.label}
+                    </Button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
           <Button
             type="button"
-            size="icon-sm"
-            variant="ghost"
+            size="sm"
+            className="w-full"
             disabled={pending}
-            aria-label={t('delete')}
-            onClick={() => onDelete(note.id)}
+            onClick={() => {
+              onSavePrivacy({
+                noteId: note.id,
+                privacyLevel,
+                hiddenFrom: privacyLevel === 'personal' ? [] : hiddenFrom,
+              });
+              setEditing(false);
+            }}
           >
-            <Trash2 className="size-3.5" />
+            {t('privacySave')}
           </Button>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
     </li>
   );
 }
@@ -75,6 +172,7 @@ export function FamilyNotesSheet(): React.JSX.Element {
   const t = useTranslations('Dashboard.notes');
   const [open, setOpen] = useState(false);
   const [notes, setNotes] = useState<VisibleNote[]>([]);
+  const [members, setMembers] = useState<NoteMemberOption[]>([]);
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
   const [familyRole, setFamilyRole] = useState<'owner' | 'adult' | 'child' | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -91,6 +189,7 @@ export function FamilyNotesSheet(): React.JSX.Element {
       return;
     }
     setNotes(result.notes);
+    setMembers(result.members);
     setCurrentUserId(result.currentUserId);
     setFamilyRole(result.familyRole);
   }, [t]);
@@ -99,6 +198,22 @@ export function FamilyNotesSheet(): React.JSX.Element {
     startTransition(async () => {
       setError(null);
       const result = await deleteNoteAction({ noteId });
+      if (!result.ok) {
+        setError(t(`errors.${result.error}`));
+        return;
+      }
+      await refresh();
+    });
+  }
+
+  function onSavePrivacy(input: {
+    noteId: number;
+    privacyLevel: PrivacyLevel;
+    hiddenFrom: number[];
+  }): void {
+    startTransition(async () => {
+      setError(null);
+      const result = await updateNotePrivacyAction(input);
       if (!result.ok) {
         setError(t(`errors.${result.error}`));
         return;
@@ -132,6 +247,9 @@ export function FamilyNotesSheet(): React.JSX.Element {
         </SheetHeader>
 
         <div className="space-y-3 px-4 pt-4">
+          <p className="rounded-xl bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+            {t('trustHint')}
+          </p>
           <Button
             type="button"
             size="sm"
@@ -164,17 +282,19 @@ export function FamilyNotesSheet(): React.JSX.Element {
           ) : (
             <ul className="space-y-3">
               {notes.map((note) => {
-                const canDelete =
+                const canManage =
                   familyRole === 'owner'
                   || familyRole === 'adult'
                   || (currentUserId !== null && note.createdBy === currentUserId);
                 return (
                   <NoteRow
-                    key={note.id}
+                    key={`${note.id}-${note.privacyLevel}-${(note.hiddenFrom ?? []).join(',')}`}
                     note={note}
-                    canDelete={canDelete}
+                    canManage={canManage}
+                    members={members}
                     pending={pending}
                     onDelete={onDelete}
+                    onSavePrivacy={onSavePrivacy}
                   />
                 );
               })}

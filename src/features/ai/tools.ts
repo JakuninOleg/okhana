@@ -150,7 +150,7 @@ export function getAiToolDefinitions(): GoAiToolDefinition[] {
       function: {
         name: 'create_task',
         description:
-          'TASKS / ПОРУЧЕНИЯ: create something someone should DO (buy milk, call doctor, pick up child). Triggers: "запомни купи…", "напомни…", "поручи…", "remember to…". Not for static facts (remember_note) or anniversaries/birthdays (create_memorable_date). Assign by member id or entire family; self-reminder → current user.',
+          'TASKS / ПОРУЧЕНИЯ: create something someone should DO (buy milk, call doctor, pick up child). Triggers: "запомни купи…", "напомни…", "поручи…", "remember to…". Not for static facts (remember_note) or anniversaries/birthdays (create_memorable_date). Assign by member id from the family list — when the user says mom/маме/папа/etc., use that member\'s id (kinship field). Self-reminder → current user; entire family → assignToEntireFamily.',
         parameters: {
           type: 'object',
           properties: {
