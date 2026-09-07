@@ -1,4 +1,4 @@
-import { sql } from 'drizzle-orm';
+import { sql, and, eq } from 'drizzle-orm';
 import { db } from '@/lib/server/db';
 import { aiUsageFamilyDaily, aiUsageUserDaily } from '@/lib/server/db/schema';
 
@@ -171,3 +171,103 @@ export async function consumeDailyChatQuota(input: {
     throw error;
   }
 }
+
+export type ChatQuotaSnapshot = {
+  usageDate: string;
+  familyLimit: number;
+  userLimit: number;
+  familyUsed: number;
+  userUsed: number;
+  familyRemaining: number;
+  userRemaining: number;
+  /** Binding constraint — what the user can still send today. */
+  remaining: number;
+  disabled: boolean;
+};
+
+function buildSnapshot(input: {
+  usageDate: string;
+  familyLimit: number;
+  userLimit: number;
+  familyUsed: number;
+  userUsed: number;
+  disabled?: boolean;
+}): ChatQuotaSnapshot {
+  const familyRemaining = Math.max(0, input.familyLimit - input.familyUsed);
+  const userRemaining = Math.max(0, input.userLimit - input.userUsed);
+  return {
+    usageDate: input.usageDate,
+    familyLimit: input.familyLimit,
+    userLimit: input.userLimit,
+    familyUsed: input.familyUsed,
+    userUsed: input.userUsed,
+    familyRemaining,
+    userRemaining,
+    remaining: Math.min(familyRemaining, userRemaining),
+    disabled: input.disabled === true,
+  };
+}
+
+export function chatQuotaSnapshotFromConsume(
+  result: Extract<ConsumeChatQuotaResult, { ok: true }>,
+): ChatQuotaSnapshot {
+  return buildSnapshot({
+    usageDate: result.usageDate,
+    familyLimit: result.familyLimit,
+    userLimit: result.userLimit,
+    familyUsed: result.familyCount,
+    userUsed: result.userCount,
+  });
+}
+
+/** Read-only view of today's usage (does not increment). */
+export async function getDailyChatQuotaSnapshot(input: {
+  familyId: number;
+  userId: number;
+  now?: Date;
+}): Promise<ChatQuotaSnapshot> {
+  const { familyLimit, userLimit } = getChatDailyLimits();
+  const usageDate = moscowUsageDateYmd(input.now);
+
+  if (isChatKillSwitchOn()) {
+    return buildSnapshot({
+      usageDate,
+      familyLimit,
+      userLimit,
+      familyUsed: familyLimit,
+      userUsed: userLimit,
+      disabled: true,
+    });
+  }
+
+  const [familyRow] = await db
+    .select({ chatCount: aiUsageFamilyDaily.chatCount })
+    .from(aiUsageFamilyDaily)
+    .where(
+      and(
+        eq(aiUsageFamilyDaily.familyId, input.familyId),
+        eq(aiUsageFamilyDaily.usageDate, usageDate),
+      ),
+    )
+    .limit(1);
+
+  const [userRow] = await db
+    .select({ chatCount: aiUsageUserDaily.chatCount })
+    .from(aiUsageUserDaily)
+    .where(
+      and(
+        eq(aiUsageUserDaily.userId, input.userId),
+        eq(aiUsageUserDaily.usageDate, usageDate),
+      ),
+    )
+    .limit(1);
+
+  return buildSnapshot({
+    usageDate,
+    familyLimit,
+    userLimit,
+    familyUsed: familyRow?.chatCount ?? 0,
+    userUsed: userRow?.chatCount ?? 0,
+  });
+}
+

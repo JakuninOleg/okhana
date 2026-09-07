@@ -12,7 +12,7 @@ import {
   type CachedChatContext,
 } from '@/features/chat/chat-context-cache';
 import { routing, type Locale } from '@/i18n/routing';
-import { consumeDailyChatQuota } from '@/lib/server/ai-usage-quota';
+import { consumeDailyChatQuota, chatQuotaSnapshotFromConsume } from '@/lib/server/ai-usage-quota';
 import { db } from '@/lib/server/db';
 import { withDbRetry } from '@/lib/server/db/client';
 import { aiChatMessages, aiConversations, users } from '@/lib/server/db/schema';
@@ -276,7 +276,7 @@ export async function POST(request: Request): Promise<Response> {
     })),
   ];
 
-  return createChatWithToolsStream({
+  const streamResponse = createChatWithToolsStream({
     messages: modelMessages,
     emptyAssistantFallback: locale === 'ru'
       ? 'Охана не вернула ответ. Попробуйте ещё раз.'
@@ -306,5 +306,19 @@ export async function POST(request: Request): Promise<Response> {
         // Best-effort persistence — reply already streamed.
       }
     },
+  });
+
+  const snapshot = chatQuotaSnapshotFromConsume(quota);
+  const headers = new Headers(streamResponse.headers);
+  headers.set('X-Okhana-Quota-Remaining', String(snapshot.remaining));
+  headers.set('X-Okhana-Quota-Family-Remaining', String(snapshot.familyRemaining));
+  headers.set('X-Okhana-Quota-User-Remaining', String(snapshot.userRemaining));
+  headers.set('X-Okhana-Quota-Family-Limit', String(snapshot.familyLimit));
+  headers.set('X-Okhana-Quota-User-Limit', String(snapshot.userLimit));
+
+  return new Response(streamResponse.body, {
+    status: streamResponse.status,
+    statusText: streamResponse.statusText,
+    headers,
   });
 }

@@ -411,6 +411,8 @@
       "quotaFamilyDaily": "Your family reached today’s chat limit ({limit}). Try again tomorrow.",
       "quotaUserDaily": "You reached your personal chat limit for today ({limit}). Try again tomorrow.",
       "quotaDisabled": "Chat is temporarily paused. Please try again later.",
+      "quotaRemaining": "{count, plural, one {# message left today} other {# messages left today}}",
+      "quotaBreakdown": "You: {userRemaining}/{userLimit} · Family: {familyRemaining}/{familyLimit}",
       "voiceTranscribeFailed": "Could not understand the recording. Hold the mic a bit longer and try again.",
       "voiceMicDenied": "Microphone permission is required"
     },

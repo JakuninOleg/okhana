@@ -2,7 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockAuth = vi.hoisted(() => vi.fn());
 const mockCreateChatWithToolsStream = vi.hoisted(() =>
-  vi.fn((_options: unknown) => new Response('stream')),
+  vi.fn((_options: unknown) => new Response('stream', {
+    headers: { 'Content-Type': 'text/plain' },
+  })),
 );
 const mockGetGoAiConfig = vi.hoisted(() => vi.fn());
 
@@ -251,6 +253,8 @@ describe('POST /api/chat', () => {
     }));
 
     expect(res).toBeInstanceOf(Response);
+    expect(res.headers.get('X-Okhana-Quota-Remaining')).toBe('149');
+    expect(res.headers.get('X-Okhana-Quota-User-Remaining')).toBe('79');
     expect(mockConsumeDailyChatQuota).toHaveBeenCalledWith({
       familyId: 3,
       userId: 9,

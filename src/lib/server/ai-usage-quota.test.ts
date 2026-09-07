@@ -24,6 +24,8 @@ vi.mock('@/lib/server/db/schema', () => ({
 
 vi.mock('drizzle-orm', () => ({
   sql: (...args: unknown[]) => args,
+  and: (...args: unknown[]) => args,
+  eq: (...args: unknown[]) => args,
 }));
 
 describe('consumeDailyChatQuota', () => {
@@ -151,5 +153,25 @@ describe('consumeDailyChatQuota', () => {
     await expect(
       consumeDailyChatQuota({ familyId: 1, userId: 2 }),
     ).resolves.toMatchObject({ ok: false, reason: 'user_daily_limit' });
+  });
+});
+
+describe('chatQuotaSnapshotFromConsume', () => {
+  it('exposes the binding remaining count', async () => {
+    const { chatQuotaSnapshotFromConsume } = await import('./ai-usage-quota');
+    expect(
+      chatQuotaSnapshotFromConsume({
+        ok: true,
+        usageDate: '2026-09-07',
+        familyCount: 140,
+        userCount: 70,
+        familyLimit: 150,
+        userLimit: 80,
+      }),
+    ).toMatchObject({
+      familyRemaining: 10,
+      userRemaining: 10,
+      remaining: 10,
+    });
   });
 });

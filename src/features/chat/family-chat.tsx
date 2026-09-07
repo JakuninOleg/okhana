@@ -51,6 +51,64 @@ export type { FamilyChatMessage };
 
 type ChatStatus = 'idle' | 'loadingHistory' | 'streaming' | 'error';
 
+type ChatQuotaView = {
+  remaining: number;
+  familyRemaining: number;
+  userRemaining: number;
+  familyLimit: number;
+  userLimit: number;
+  disabled: boolean;
+};
+
+function quotaFromHistoryPayload(raw: unknown): ChatQuotaView | null {
+  if (!raw || typeof raw !== 'object') {
+    return null;
+  }
+  const quota = raw as Record<string, unknown>;
+  if (
+    typeof quota.remaining !== 'number'
+    || typeof quota.familyRemaining !== 'number'
+    || typeof quota.userRemaining !== 'number'
+    || typeof quota.familyLimit !== 'number'
+    || typeof quota.userLimit !== 'number'
+  ) {
+    return null;
+  }
+  return {
+    remaining: quota.remaining,
+    familyRemaining: quota.familyRemaining,
+    userRemaining: quota.userRemaining,
+    familyLimit: quota.familyLimit,
+    userLimit: quota.userLimit,
+    disabled: quota.disabled === true,
+  };
+}
+
+function quotaFromResponseHeaders(headers: Headers): ChatQuotaView | null {
+  const remaining = Number(headers.get('X-Okhana-Quota-Remaining'));
+  const familyRemaining = Number(headers.get('X-Okhana-Quota-Family-Remaining'));
+  const userRemaining = Number(headers.get('X-Okhana-Quota-User-Remaining'));
+  const familyLimit = Number(headers.get('X-Okhana-Quota-Family-Limit'));
+  const userLimit = Number(headers.get('X-Okhana-Quota-User-Limit'));
+  if (
+    !Number.isFinite(remaining)
+    || !Number.isFinite(familyRemaining)
+    || !Number.isFinite(userRemaining)
+    || !Number.isFinite(familyLimit)
+    || !Number.isFinite(userLimit)
+  ) {
+    return null;
+  }
+  return {
+    remaining,
+    familyRemaining,
+    userRemaining,
+    familyLimit,
+    userLimit,
+    disabled: false,
+  };
+}
+
 const sttLanguageByLocale = {
   ru: 'ru',
   en: 'en',
@@ -102,6 +160,7 @@ export function FamilyChat(): React.JSX.Element {
   const { messages, input } = chat;
   const [status, setStatus] = useState<ChatStatus>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [quota, setQuota] = useState<ChatQuotaView | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const speechAbortRef = useRef<AbortController | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
@@ -193,9 +252,16 @@ export function FamilyChat(): React.JSX.Element {
         if (!response.ok || cancelled) {
           return;
         }
-        const data = (await response.json()) as { messages?: FamilyChatMessage[] };
+        const data = (await response.json()) as {
+          messages?: FamilyChatMessage[];
+          quota?: unknown;
+        };
         if (cancelled) {
           return;
+        }
+        const nextQuota = quotaFromHistoryPayload(data.quota);
+        if (nextQuota) {
+          setQuota(nextQuota);
         }
         replaceFamilyChatSnapshot({
           messages: data.messages ?? [],
@@ -300,15 +366,27 @@ export function FamilyChat(): React.JSX.Element {
         } | null;
         const errorCode = payload?.error;
         if (errorCode === 'family_daily_limit') {
+          setQuota((prev) => prev
+            ? { ...prev, remaining: 0, familyRemaining: 0 }
+            : null);
           throw new Error(t('quotaFamilyDaily', { limit: payload?.familyLimit ?? 150 }));
         }
         if (errorCode === 'user_daily_limit') {
+          setQuota((prev) => prev
+            ? { ...prev, remaining: 0, userRemaining: 0 }
+            : null);
           throw new Error(t('quotaUserDaily', { limit: payload?.userLimit ?? 80 }));
         }
         if (errorCode === 'disabled') {
+          setQuota((prev) => prev ? { ...prev, disabled: true, remaining: 0 } : null);
           throw new Error(t('quotaDisabled'));
         }
         throw new Error(payload?.error ?? t('requestFailed'));
+      }
+
+      const nextQuota = quotaFromResponseHeaders(response.headers);
+      if (nextQuota) {
+        setQuota(nextQuota);
       }
       if (!response.body) {
         throw new Error(t('streamUnavailable'));
@@ -520,6 +598,25 @@ export function FamilyChat(): React.JSX.Element {
         ) : null}
 
         <CardFooter className="shrink-0 flex-col items-stretch gap-2 border-border/70 bg-muted/30 px-3 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] dark:border-border dark:bg-muted/50">
+          {quota ? (
+            <p
+              className={cn(
+                'px-0.5 text-xs text-muted-foreground',
+                (quota.disabled || quota.remaining <= 5) && 'text-destructive',
+                !quota.disabled && quota.remaining > 5 && quota.remaining <= 20 && 'text-brand-peach',
+              )}
+              title={t('quotaBreakdown', {
+                userRemaining: quota.userRemaining,
+                userLimit: quota.userLimit,
+                familyRemaining: quota.familyRemaining,
+                familyLimit: quota.familyLimit,
+              })}
+            >
+              {quota.disabled
+                ? t('quotaDisabled')
+                : t('quotaRemaining', { count: quota.remaining })}
+            </p>
+          ) : null}
           {messages.length > 0 ? (
             <div className="flex flex-wrap gap-2 px-0.5">
               {SUGGESTION_KEYS.map((key) => (
