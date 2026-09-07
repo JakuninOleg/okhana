@@ -293,7 +293,21 @@ export function FamilyChat(): React.JSX.Element {
       });
 
       if (!response.ok) {
-        const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+        const payload = (await response.json().catch(() => null)) as {
+          error?: string;
+          familyLimit?: number;
+          userLimit?: number;
+        } | null;
+        const errorCode = payload?.error;
+        if (errorCode === 'family_daily_limit') {
+          throw new Error(t('quotaFamilyDaily', { limit: payload?.familyLimit ?? 150 }));
+        }
+        if (errorCode === 'user_daily_limit') {
+          throw new Error(t('quotaUserDaily', { limit: payload?.userLimit ?? 80 }));
+        }
+        if (errorCode === 'disabled') {
+          throw new Error(t('quotaDisabled'));
+        }
         throw new Error(payload?.error ?? t('requestFailed'));
       }
       if (!response.body) {

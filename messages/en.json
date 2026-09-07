@@ -408,6 +408,9 @@
       "requestFailed": "Could not reach Okhana. Try again.",
       "streamUnavailable": "Streaming is not available in this browser.",
       "emptyReply": "Okhana did not return a reply. Please try again.",
+      "quotaFamilyDaily": "Your family reached today’s chat limit ({limit}). Try again tomorrow.",
+      "quotaUserDaily": "You reached your personal chat limit for today ({limit}). Try again tomorrow.",
+      "quotaDisabled": "Chat is temporarily paused. Please try again later.",
       "voiceTranscribeFailed": "Could not understand the recording. Hold the mic a bit longer and try again.",
       "voiceMicDenied": "Microphone permission is required"
     },
