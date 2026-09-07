@@ -18,7 +18,7 @@ describe('seo metadata', () => {
   it('builds locale metadata with OG and canonical', () => {
     const meta = buildLocaleMetadata('en', {
       title: 'Okhana — Family. Together. Always.',
-      description: 'AI family hub',
+      description: 'One place for the family',
       ogTitle: 'Okhana',
       ogDescription: 'Family hub',
     });

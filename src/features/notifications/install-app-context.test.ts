@@ -55,6 +55,7 @@ describe('install-app-context', () => {
         nowMs: 1_000 + 1_000,
         standalone: false,
         pushReady: false,
+        platform: 'ios',
       }),
     ).toBe(false);
     expect(
@@ -63,6 +64,7 @@ describe('install-app-context', () => {
         nowMs: 10_000,
         standalone: true,
         pushReady: true,
+        platform: 'android',
       }),
     ).toBe(false);
     expect(
@@ -71,8 +73,21 @@ describe('install-app-context', () => {
         nowMs: 10_000,
         standalone: true,
         pushReady: false,
+        platform: 'ios',
       }),
     ).toBe(true);
+  });
+
+  it('never offers the phone install wizard on desktop', () => {
+    expect(
+      shouldOfferInstallWizard({
+        dismissedAt: null,
+        nowMs: 10_000,
+        standalone: false,
+        pushReady: false,
+        platform: 'desktop',
+      }),
+    ).toBe(false);
   });
 
   it('persists and reads dismiss timestamps safely', () => {

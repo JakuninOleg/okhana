@@ -5,7 +5,6 @@ import { NextIntlClientProvider } from 'next-intl';
 import { getMessages, getTranslations } from 'next-intl/server';
 import { Navbar } from '@/components/navbar';
 import { PwaRegister } from '@/components/pwa-register';
-import { Container } from '@/components/ui/container';
 import { brand } from '@/lib/brand';
 import { clerkAppearance } from '@/lib/clerk-appearance';
 import { buildJsonLd, buildLocaleMetadata } from '@/lib/seo';
@@ -87,9 +86,10 @@ export default async function LocaleLayout({
         <ClerkProvider appearance={clerkAppearance}>
           <NextIntlClientProvider messages={messages}>
             <Navbar locale={locale} />
-            <Container className="flex min-h-0 flex-1 flex-col overflow-y-auto pb-[env(safe-area-inset-bottom)]">
+            {/* Full-bleed shell — pages that need a reading column wrap themselves (e.g. dashboard). */}
+            <div className="flex min-h-0 w-full flex-1 flex-col overflow-y-auto pb-[env(safe-area-inset-bottom)]">
               {children}
-            </Container>
+            </div>
             <PwaRegister />
           </NextIntlClientProvider>
         </ClerkProvider>

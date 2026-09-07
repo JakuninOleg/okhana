@@ -30,7 +30,7 @@ const OPEN_DELAY_MS = 1600;
 
 /**
  * Soft onboarding: add Okhana icon to the phone + enable notifications.
- * Avoids the word “PWA” — parents care about the icon and alerts.
+ * Phone-only — desktop users manage push in family settings.
  */
 export function InstallAppWizard(): React.JSX.Element | null {
   const t = useTranslations('Dashboard.installWizard');
@@ -59,6 +59,10 @@ export function InstallAppWizard(): React.JSX.Element | null {
           platform: navigator.platform,
           maxTouchPoints: navigator.maxTouchPoints,
         });
+        // Install wizard is phone-only; desktop push lives in family settings.
+        if (nextPlatform === 'desktop') {
+          return;
+        }
         const nextStandalone = isStandaloneDisplay({
           matchMedia: (query) => window.matchMedia(query),
           navigatorStandalone: Boolean(
@@ -80,6 +84,7 @@ export function InstallAppWizard(): React.JSX.Element | null {
             nowMs: Date.now(),
             standalone: nextStandalone,
             pushReady,
+            platform: nextPlatform,
           })
         ) {
           setOpen(true);
@@ -161,10 +166,10 @@ export function InstallAppWizard(): React.JSX.Element | null {
           <SheetDescription>{t('subtitle')}</SheetDescription>
         </SheetHeader>
 
-        <div className="mt-4 space-y-5 px-1 pb-2">
-          <section className="space-y-3 rounded-2xl border border-border/60 bg-muted/20 p-3">
+        <div className="space-y-5 px-4 pb-4">
+          <section className="space-y-3 rounded-2xl border border-border/60 bg-muted/25 px-4 py-3.5">
             <div className="flex items-start gap-3">
-              <div className="mt-0.5 rounded-xl bg-background/80 p-2 text-brand-peach">
+              <div className="mt-0.5 shrink-0 rounded-xl bg-background/80 p-2.5 text-brand-peach">
                 <Home className="size-4" aria-hidden />
               </div>
               <div className="min-w-0 flex-1 space-y-1">
@@ -176,7 +181,7 @@ export function InstallAppWizard(): React.JSX.Element | null {
             </div>
 
             {!standalone && platform === 'ios' ? (
-              <ol className="list-decimal space-y-1.5 pl-5 text-sm text-muted-foreground">
+              <ol className="list-decimal space-y-2 pl-5 text-sm text-muted-foreground">
                 <li>{t('iosStep1')}</li>
                 <li className="flex flex-wrap items-center gap-1">
                   <span>{t('iosStep2Before')}</span>
@@ -188,23 +193,36 @@ export function InstallAppWizard(): React.JSX.Element | null {
             ) : null}
 
             {!standalone && platform === 'android' && !deferredPrompt ? (
-              <ol className="list-decimal space-y-1.5 pl-5 text-sm text-muted-foreground">
+              <ol className="list-decimal space-y-2 pl-5 text-sm text-muted-foreground">
                 <li>{t('androidStep1')}</li>
                 <li>{t('androidStep2')}</li>
               </ol>
             ) : null}
 
+            {!standalone && platform === 'desktop' && !deferredPrompt ? (
+              <ol className="list-decimal space-y-2 pl-5 text-sm text-muted-foreground">
+                <li>{t('desktopStep1')}</li>
+                <li>{t('desktopStep2')}</li>
+              </ol>
+            ) : null}
+
             {!standalone && deferredPrompt ? (
-              <Button type="button" className="w-full" disabled={pending} onClick={installNative}>
+              <Button
+                type="button"
+                variant="cta"
+                className="w-full font-semibold"
+                disabled={pending}
+                onClick={installNative}
+              >
                 {pending ? <Loader2 className="size-3.5 animate-spin" /> : null}
                 {t('installButton')}
               </Button>
             ) : null}
           </section>
 
-          <section className="space-y-3 rounded-2xl border border-border/60 bg-muted/20 p-3">
+          <section className="space-y-3 rounded-2xl border border-border/60 bg-muted/25 px-4 py-3.5">
             <div className="flex items-start gap-3">
-              <div className="mt-0.5 rounded-xl bg-background/80 p-2 text-brand-peach">
+              <div className="mt-0.5 shrink-0 rounded-xl bg-background/80 p-2.5 text-brand-peach">
                 <Bell className="size-4" aria-hidden />
               </div>
               <div className="min-w-0 flex-1 space-y-1">
@@ -229,14 +247,20 @@ export function InstallAppWizard(): React.JSX.Element | null {
               </div>
             </div>
             {pushCanEnable ? (
-              <Button type="button" className="w-full" disabled={pending} onClick={enablePush}>
+              <Button
+                type="button"
+                variant="cta"
+                className="w-full font-semibold"
+                disabled={pending}
+                onClick={enablePush}
+              >
                 {pending ? <Loader2 className="size-3.5 animate-spin" /> : null}
                 {pushStatus.startsWith('error') ? tPush('pushRetry') : tPush('pushEnable')}
               </Button>
             ) : null}
           </section>
 
-          <Button type="button" variant="ghost" className="w-full" onClick={dismiss}>
+          <Button type="button" variant="outline" className="w-full" onClick={dismiss}>
             {t('later')}
           </Button>
         </div>

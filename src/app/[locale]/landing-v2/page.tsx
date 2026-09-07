@@ -1,10 +1,10 @@
 import { auth } from '@clerk/nextjs/server';
-import { LandingPage } from '@/features/marketing/landing-page';
+import { LandingPageV2 } from '@/features/marketing/landing-page-v2';
 import { redirect } from '@/i18n/navigation';
 
 export const dynamic = 'force-dynamic';
 
-export default async function Home({
+export default async function LandingV2Page({
   params,
 }: {
   params: Promise<{ locale: string }>;
@@ -15,5 +15,5 @@ export default async function Home({
     redirect({ href: '/dashboard', locale });
   }
 
-  return <LandingPage />;
+  return <LandingPageV2 />;
 }

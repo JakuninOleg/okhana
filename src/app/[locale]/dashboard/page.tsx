@@ -1,6 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
+import { Container } from '@/components/ui/container';
 import { FamilyHubMenu } from '@/features/family/family-hub-menu';
 import { FamilySetupForm } from '@/features/family/family-setup-form';
 import { getDashboardFamilyData } from '@/features/family/get-dashboard-family';
@@ -74,18 +75,18 @@ export default async function DashboardPage({
 
   if (dbError) {
     return (
-      <main className="flex flex-1 flex-col items-center justify-center gap-4 py-8">
+      <Container className="flex flex-1 flex-col items-center justify-center gap-4 py-8">
         <h1 className="text-2xl font-semibold tracking-tight">
           {t('greeting', { email })}
         </h1>
         <p className="text-sm text-destructive">{dbError}</p>
-      </main>
+      </Container>
     );
   }
 
   if (!hasFamily) {
     return (
-      <main className="relative flex flex-1 flex-col overflow-y-auto py-6 sm:py-10">
+      <Container className="relative flex flex-1 flex-col overflow-y-auto py-6 sm:py-10">
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--brand-sun)_0%,_transparent_55%),radial-gradient(ellipse_at_bottom,_var(--brand-aqua)_0%,_transparent_50%)] opacity-60 dark:bg-[radial-gradient(ellipse_at_top,_var(--brand-sun)_0%,_transparent_50%),radial-gradient(ellipse_at_bottom,_var(--brand-peach)_0%,_transparent_45%)] dark:opacity-22"
@@ -107,12 +108,12 @@ export default async function DashboardPage({
           </header>
           <FamilySetupForm />
         </div>
-      </main>
+      </Container>
     );
   }
 
   return (
-    <main className="flex min-h-0 flex-1 flex-col py-3 sm:py-4 lg:overflow-hidden">
+    <Container className="flex min-h-0 flex-1 flex-col py-3 sm:py-4 lg:overflow-hidden">
       <InstallAppWizard />
       <FamilyHubMenu
         familyName={familyName!}
@@ -124,6 +125,6 @@ export default async function DashboardPage({
         <FamilyTasksPriority initialTasks={activeTasks} />
         <FamilyChatLoader />
       </FamilyHubMenu>
-    </main>
+    </Container>
   );
 }

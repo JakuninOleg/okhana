@@ -13,16 +13,33 @@ vi.mock('next-intl/server', () => ({
       const map: Record<string, string> = {
         brand: 'Okhana',
         tagline: 'Family. Together. Always.',
-        headline: 'Your family hub, guided by AI',
-        pitch: 'Shared notes and a private assistant.',
+        headline: 'Family life — without the endless group chat',
+        pitch: 'Tell Okhana: remind Dad to pick up Sofia.',
         signIn: 'Sign in',
         signUp: 'Create account',
+        ctaPrimary: 'Try it free',
         greeting: `Hello, ${vars?.email ?? ''}`,
         signOut: 'Sign out',
       };
       return map[key] ?? key;
     }),
 }));
+
+vi.mock('@/features/marketing/landing-page', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const React = require('react') as typeof import('react');
+  return {
+    LandingPage: () =>
+      React.createElement(
+        'main',
+        null,
+        React.createElement('p', null, 'Okhana'),
+        React.createElement('p', null, 'Family. Together. Always.'),
+        React.createElement('a', { href: '/sign-in' }, 'Sign in'),
+        React.createElement('a', { href: '/sign-up' }, 'Try it free'),
+      ),
+  };
+});
 
 vi.mock('next/image', () => ({
   default: (props: { alt?: string; src: string; className?: string }) =>
