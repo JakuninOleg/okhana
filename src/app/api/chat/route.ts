@@ -13,6 +13,7 @@ import {
 } from '@/features/chat/chat-context-cache';
 import { listKinshipLabelsForViewer } from '@/features/family/member-kinship';
 import { routing, type Locale } from '@/i18n/routing';
+import { consumeDailyChatQuota, chatQuotaSnapshotFromConsume } from '@/lib/server/ai-usage-quota';
 import { db } from '@/lib/server/db';
 import { withDbRetry } from '@/lib/server/db/client';
 import { aiChatMessages, aiConversations, users } from '@/lib/server/db/schema';
@@ -238,10 +239,43 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ error: 'Invalid chat payload' }, { status: 400 });
   }
 
-  // Hot path: memory cache only. Never wait on Supabase before the first Go-Ai token.
-  const context = contextFromCache(clerkUserId);
+  // Prefer cache; if cold, load membership before Go-Ai so daily quotas can run.
+  let context = contextFromCache(clerkUserId);
   if (!context) {
-    void loadChatContextFromDb(clerkUserId).catch(() => undefined);
+    try {
+      context = await loadChatContextFromDb(clerkUserId);
+    } catch {
+      return Response.json({ error: 'no_family' }, { status: 403 });
+    }
+  }
+
+  let quota;
+  try {
+    quota = await consumeDailyChatQuota({
+      familyId: context.familyId,
+      userId: context.userId,
+    });
+  } catch (error) {
+    console.error('chat daily quota failed', {
+      message: error instanceof Error ? error.message.slice(0, 120) : 'unknown',
+    });
+    return Response.json({ error: 'quota_unavailable' }, { status: 503 });
+  }
+
+  if (!quota.ok) {
+    const retryAfterSec = 60 * 60;
+    return Response.json(
+      {
+        error: quota.reason,
+        familyLimit: quota.familyLimit,
+        userLimit: quota.userLimit,
+        usageDate: quota.usageDate,
+      },
+      {
+        status: quota.reason === 'disabled' ? 503 : 429,
+        headers: { 'Retry-After': String(retryAfterSec) },
+      },
+    );
   }
 
   const { locale, messages: requestMessages, clientNow, timeZone } = parsedBody.data;
@@ -253,9 +287,9 @@ export async function POST(request: Request): Promise<Response> {
       role: 'system',
       content: buildSystemPrompt({
         locale: locale as Locale,
-        familyRole: context?.familyRole ?? 'adult',
-        familyMembers: context?.familyMembers ?? [],
-        isNewConversation: context?.isNewConversation ?? !context,
+        familyRole: context.familyRole,
+        familyMembers: context.familyMembers,
+        isNewConversation: context.isNewConversation,
         clientNow: clientNow ?? null,
         timeZone: timeZone ?? null,
       }),
@@ -266,19 +300,17 @@ export async function POST(request: Request): Promise<Response> {
     })),
   ];
 
-  return createChatWithToolsStream({
+  const streamResponse = createChatWithToolsStream({
     messages: modelMessages,
     emptyAssistantFallback: locale === 'ru'
       ? 'Охана не вернула ответ. Попробуйте ещё раз.'
       : EMPTY_ASSISTANT_FALLBACK,
-    toolContext: context
-      ? {
-        familyId: context.familyId,
-        userId: context.userId,
-        familyRole: context.familyRole,
-        clientNow: clientNow ?? null,
-      }
-      : undefined,
+    toolContext: {
+      familyId: context.familyId,
+      userId: context.userId,
+      familyRole: context.familyRole,
+      clientNow: clientNow ?? null,
+    },
     signal: request.signal,
     onComplete: async ({ text }) => {
       const latest = contextFromCache(clerkUserId) ?? context;
@@ -298,5 +330,19 @@ export async function POST(request: Request): Promise<Response> {
         // Best-effort persistence — reply already streamed.
       }
     },
+  });
+
+  const snapshot = chatQuotaSnapshotFromConsume(quota);
+  const headers = new Headers(streamResponse.headers);
+  headers.set('X-Okhana-Quota-Remaining', String(snapshot.remaining));
+  headers.set('X-Okhana-Quota-Family-Remaining', String(snapshot.familyRemaining));
+  headers.set('X-Okhana-Quota-User-Remaining', String(snapshot.userRemaining));
+  headers.set('X-Okhana-Quota-Family-Limit', String(snapshot.familyLimit));
+  headers.set('X-Okhana-Quota-User-Limit', String(snapshot.userLimit));
+
+  return new Response(streamResponse.body, {
+    status: streamResponse.status,
+    statusText: streamResponse.statusText,
+    headers,
   });
 }

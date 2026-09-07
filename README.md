@@ -200,6 +200,9 @@ All deploy targets share the **same Supabase `okhana` project** (no dev database
 | `CLERK_WEBHOOK_SECRET` | Clerk webhook signing secret |
 | `GO_AI_BASE_URL` | Go-Ai gateway base URL (server-only) |
 | `GO_AI_SHARED_SECRET` | Go-Ai bearer secret (server-only, never `NEXT_PUBLIC_*`) |
+| `AI_CHAT_DAILY_FAMILY_LIMIT` | Optional. Soft-launch family chat ceiling per Moscow day (default **150**) |
+| `AI_CHAT_DAILY_USER_LIMIT` | Optional. Soft-launch per-user chat ceiling per Moscow day (default **80**) |
+| `AI_CHAT_DISABLED` | Optional. `true` pauses all chat (kill-switch) |
 
 Set the same `DATABASE_URL` / `DIRECT_URL` in Vercel for **Preview** and **Production**.
 Use Clerk Development keys on Preview; Production keys on `main` only.

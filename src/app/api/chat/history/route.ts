@@ -1,5 +1,6 @@
 import { auth } from '@clerk/nextjs/server';
 import { and, desc, eq } from 'drizzle-orm';
+import { getDailyChatQuotaSnapshot } from '@/lib/server/ai-usage-quota';
 import { db } from '@/lib/server/db';
 import { withDbRetry } from '@/lib/server/db/client';
 import { aiChatMessages, aiConversations, users } from '@/lib/server/db/schema';
@@ -31,6 +32,11 @@ export async function GET(): Promise<Response> {
         return Response.json({ messages: [] satisfies ChatHistoryMessage[] });
       }
 
+      const quota = await getDailyChatQuotaSnapshot({
+        familyId: dbUser.familyId,
+        userId: dbUser.id,
+      });
+
       const [conversation] = await db
         .select()
         .from(aiConversations)
@@ -39,7 +45,10 @@ export async function GET(): Promise<Response> {
         .limit(1);
 
       if (!conversation) {
-        return Response.json({ messages: [] satisfies ChatHistoryMessage[] });
+        return Response.json({
+          messages: [] satisfies ChatHistoryMessage[],
+          quota,
+        });
       }
 
       const latestMessages = await db
@@ -64,6 +73,7 @@ export async function GET(): Promise<Response> {
       return Response.json({
         conversationId: conversation.id,
         messages,
+        quota,
       });
     });
   } catch (error) {

@@ -221,6 +221,32 @@ export const aiChatMessages = pgTable('ai_chat_messages', {
   index('messages_conversation_idx').on(table.conversationId, table.createdAt),
 ]);
 
+/**
+ * Soft-launch AI cost ceilings (UTC calendar day stored; app uses Europe/Moscow “today”).
+ * Family row and user row are incremented together in one transaction.
+ */
+export const aiUsageFamilyDaily = pgTable('ai_usage_family_daily', {
+  id: serial('id').primaryKey(),
+  familyId: integer('family_id').notNull().references(() => families.id, { onDelete: 'cascade' }),
+  usageDate: date('usage_date').notNull(),
+  chatCount: integer('chat_count').notNull().default(0),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex('ai_usage_family_daily_uidx').on(table.familyId, table.usageDate),
+]);
+
+export const aiUsageUserDaily = pgTable('ai_usage_user_daily', {
+  id: serial('id').primaryKey(),
+  familyId: integer('family_id').notNull().references(() => families.id, { onDelete: 'cascade' }),
+  userId: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  usageDate: date('usage_date').notNull(),
+  chatCount: integer('chat_count').notNull().default(0),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex('ai_usage_user_daily_uidx').on(table.userId, table.usageDate),
+  index('ai_usage_user_daily_family_day_idx').on(table.familyId, table.usageDate),
+]);
+
 // Relations
 export const usersRelations = relations(users, ({ one, many }) => ({
   family: one(families, { fields: [users.familyId], references: [families.id] }),
@@ -232,6 +258,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   taskAssignments: many(familyTaskAssignees),
   pushSubscriptions: many(pushSubscriptions),
   conversations: many(aiConversations),
+  aiUsageDaily: many(aiUsageUserDaily),
   kinshipViewsAsViewer: many(memberKinshipViews, { relationName: 'kinshipViewer' }),
   kinshipViewsAsSubject: many(memberKinshipViews, { relationName: 'kinshipSubject' }),
 }));
@@ -259,6 +286,7 @@ export const familiesRelations = relations(families, ({ one, many }) => ({
   familyDates: many(familyDates),
   conversations: many(aiConversations),
   proactiveNudgeDeliveries: many(proactiveNudgeDeliveries),
+  aiUsageDaily: many(aiUsageFamilyDaily),
   kinshipViews: many(memberKinshipViews),
 }));
 

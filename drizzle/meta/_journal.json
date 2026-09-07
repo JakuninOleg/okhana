@@ -50,6 +50,13 @@
       "when": 1788860000000,
       "tag": "0006_member_kinship_views",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1788864000000,
+      "tag": "0007_ai_usage_daily",
+      "breakpoints": true
     }
   ]
 }

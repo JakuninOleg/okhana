@@ -2,7 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockAuth = vi.hoisted(() => vi.fn());
 const mockCreateChatWithToolsStream = vi.hoisted(() =>
-  vi.fn((_options: unknown) => new Response('stream')),
+  vi.fn((_options: unknown) => new Response('stream', {
+    headers: { 'Content-Type': 'text/plain' },
+  })),
 );
 const mockGetGoAiConfig = vi.hoisted(() => vi.fn());
 
@@ -99,7 +101,33 @@ vi.mock('@/features/chat/chat-context-cache', () => ({
   setCachedChatContext: vi.fn(),
 }));
 
+vi.mock('@/lib/server/ai-usage-quota', () => ({
+  consumeDailyChatQuota: (...args: unknown[]) => mockConsumeDailyChatQuota(...args),
+  chatQuotaSnapshotFromConsume: (result: {
+    usageDate: string;
+    familyCount: number;
+    userCount: number;
+    familyLimit: number;
+    userLimit: number;
+  }) => {
+    const familyRemaining = Math.max(0, result.familyLimit - result.familyCount);
+    const userRemaining = Math.max(0, result.userLimit - result.userCount);
+    return {
+      usageDate: result.usageDate,
+      familyLimit: result.familyLimit,
+      userLimit: result.userLimit,
+      familyUsed: result.familyCount,
+      userUsed: result.userCount,
+      familyRemaining,
+      userRemaining,
+      remaining: Math.min(familyRemaining, userRemaining),
+      disabled: false,
+    };
+  },
+}));
+
 const mockGetCachedChatContext = vi.hoisted(() => vi.fn());
+const mockConsumeDailyChatQuota = vi.hoisted(() => vi.fn());
 
 async function loadRoute() {
   return import('./route');
@@ -111,6 +139,14 @@ describe('POST /api/chat', () => {
     mockGetGoAiConfig.mockReturnValue({
       baseUrl: 'https://go-ai.example',
       sharedSecret: 'secret',
+    });
+    mockConsumeDailyChatQuota.mockResolvedValue({
+      ok: true,
+      usageDate: '2026-09-07',
+      familyCount: 1,
+      userCount: 1,
+      familyLimit: 150,
+      userLimit: 80,
     });
     mockGetCachedChatContext.mockReturnValue({
       familyId: 3,
@@ -238,6 +274,13 @@ describe('POST /api/chat', () => {
     }));
 
     expect(res).toBeInstanceOf(Response);
+    expect(res.headers.get('X-Okhana-Quota-Remaining')).toBe('79');
+    expect(res.headers.get('X-Okhana-Quota-User-Remaining')).toBe('79');
+    expect(res.headers.get('X-Okhana-Quota-Family-Remaining')).toBe('149');
+    expect(mockConsumeDailyChatQuota).toHaveBeenCalledWith({
+      familyId: 3,
+      userId: 9,
+    });
     expect(mockCreateChatWithToolsStream).toHaveBeenCalledOnce();
     const arg = (
       mockCreateChatWithToolsStream.mock.calls as unknown as Array<
@@ -257,5 +300,29 @@ describe('POST /api/chat', () => {
     });
     expect(arg.messages[0]?.role).toBe('system');
     expect(arg.messages.some((message) => message.role === 'user')).toBe(true);
+  });
+
+  it('returns 429 when the family daily chat quota is exhausted', async () => {
+    mockAuth.mockResolvedValue({ userId: 'clerk_1' });
+    mockConsumeDailyChatQuota.mockResolvedValue({
+      ok: false,
+      reason: 'family_daily_limit',
+      usageDate: '2026-09-07',
+      familyLimit: 150,
+      userLimit: 80,
+      familyCount: 150,
+    });
+    const { POST } = await loadRoute();
+    const res = await POST(new Request('http://localhost/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        locale: 'en',
+        messages: [{ role: 'user', content: 'Hello' }],
+      }),
+    }));
+    expect(res.status).toBe(429);
+    await expect(res.json()).resolves.toMatchObject({ error: 'family_daily_limit' });
+    expect(mockCreateChatWithToolsStream).not.toHaveBeenCalled();
   });
 });
