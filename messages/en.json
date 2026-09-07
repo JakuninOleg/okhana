@@ -407,7 +407,9 @@
       "send": "Send",
       "requestFailed": "Could not reach Okhana. Try again.",
       "streamUnavailable": "Streaming is not available in this browser.",
-      "emptyReply": "Okhana did not return a reply. Please try again."
+      "emptyReply": "Okhana did not return a reply. Please try again.",
+      "voiceTranscribeFailed": "Could not understand the recording. Hold the mic a bit longer and try again.",
+      "voiceMicDenied": "Microphone permission is required"
     },
     "tasks": {
       "open": "Family tasks",

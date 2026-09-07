@@ -34,6 +34,34 @@ function pickMimeType(): string | undefined {
   return candidates.find((type) => MediaRecorder.isTypeSupported(type));
 }
 
+/**
+ * Whisper/Groq sniffs format from the upload filename extension.
+ * Safari/iOS MediaRecorder often emits audio/mp4 — naming it `.webm` causes
+ * "could not process file - is it a valid media file?".
+ */
+export function recordingFilenameForMime(mimeType: string | undefined): string {
+  const mime = (mimeType ?? '').toLowerCase();
+  if (mime.includes('webm')) {
+    return 'recording.webm';
+  }
+  if (mime.includes('ogg')) {
+    return 'recording.ogg';
+  }
+  if (mime.includes('wav')) {
+    return 'recording.wav';
+  }
+  if (mime.includes('mpeg') || mime.includes('mp3')) {
+    return 'recording.mp3';
+  }
+  if (mime.includes('m4a') || mime.includes('aac')) {
+    return 'recording.m4a';
+  }
+  if (mime.includes('mp4')) {
+    return 'recording.mp4';
+  }
+  return 'recording.webm';
+}
+
 function subscribeVoiceSupport(): () => void {
   return () => undefined;
 }
@@ -114,7 +142,8 @@ export function useVoiceRecorder(options: UseVoiceRecorderOptions): UseVoiceReco
 
     try {
       const formData = new FormData();
-      formData.append('file', blob, 'recording.webm');
+      const filename = recordingFilenameForMime(blob.type);
+      formData.append('file', blob, filename);
       const language = optionsRef.current.language;
       if (language) {
         formData.append('language', language);
