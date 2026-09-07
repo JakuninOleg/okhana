@@ -200,12 +200,7 @@ export async function LandingPageV2(): Promise<React.JSX.Element> {
         'bg-[#fbf8f3] dark:bg-background',
       )}
     >
-      <CompareBar
-        active="v2"
-        label={t('compare.label')}
-        v1={t('compare.v1')}
-        v2={t('compare.v2')}
-      />
+      <LandingCompareBar active="v2" />
 
       {/* Hero */}
       <section className="relative overflow-hidden px-4 pb-16 pt-10 sm:px-6 sm:pb-20 sm:pt-14 lg:px-10">
@@ -453,15 +448,12 @@ export async function LandingPageV2(): Promise<React.JSX.Element> {
   );
 }
 
-/** Sticky compare bar shared by landing v1 / v2 (Preview/local only — hide on Production). */
+/** Sticky compare bar — friends can switch v1 ↔ v2 on Production too. */
 export async function LandingCompareBar({
   active,
 }: {
   active: 'v1' | 'v2';
-}): Promise<React.JSX.Element | null> {
-  if (process.env.VERCEL_ENV === 'production') {
-    return null;
-  }
+}): Promise<React.JSX.Element> {
   const t = await getTranslations('Home');
   return (
     <CompareBar
