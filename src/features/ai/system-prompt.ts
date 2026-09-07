@@ -9,14 +9,15 @@ const localeLanguageName = {
 type FamilyMemberContext = {
   id: number;
   name: string | null;
-  email: string;
+  /** Optional — never sent into the system prompt (PII minimization). */
+  email?: string;
   role: string | null;
   kinshipLabel?: string | null;
   birthDate?: string | null;
 };
 
 function formatMemberForPrompt(member: FamilyMemberContext): string {
-  const display = member.name?.trim() || member.email.split('@')[0] || `member-${member.id}`;
+  const display = member.name?.trim() || `member-${member.id}`;
   const kinship = member.kinshipLabel ?? 'unspecified';
   const role = member.role ?? 'unknown';
   const age = ageFromBirthDate(member.birthDate ?? null);

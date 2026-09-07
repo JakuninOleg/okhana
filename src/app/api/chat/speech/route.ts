@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { isConfidentlyEnglish, truncateForTts } from '@/features/ai/english-guard';
 import { goAiAudioSpeech, getGoAiConfig, readGoAiSafeError } from '@/features/ai/go-ai-client';
 import { routing } from '@/i18n/routing';
+import { consumeRateLimit } from '@/lib/server/rate-limit';
 
 export const runtime = 'nodejs';
 
@@ -27,6 +28,18 @@ export async function POST(request: Request): Promise<Response> {
   const { userId } = await auth();
   if (!userId) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const rate = consumeRateLimit({
+    key: `tts:${userId}`,
+    limit: 20,
+    windowMs: 60_000,
+  });
+  if (!rate.ok) {
+    return Response.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rate.retryAfterSec) } },
+    );
   }
 
   try {

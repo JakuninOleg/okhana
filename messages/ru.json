@@ -191,8 +191,15 @@
       "editMemberTitle": "Профиль участника",
       "emailLabel": "Email",
       "displayNameLabel": "Как зовут в семье",
-      "kinshipLabel": "Родство",
+      "kinshipLabel": "Как вы их называете",
+      "kinshipHint": "Видно только вам — другие участники могут задать своё родство для этого человека.",
       "kinshipUnset": "Не указано",
+      "editKinship": "Указать родство",
+      "rotateInvite": "Сменить код приглашения",
+      "rotatingInvite": "Меняем…",
+      "leaveFamily": "Выйти из семьи",
+      "leavingFamily": "Выходим…",
+      "ownerLeaveHint": "Сначала передайте владение или удалите остальных участников.",
       "sexLabel": "Пол (необязательно)",
       "sexUnspecified": "Не указывать",
       "sexFemale": "Женский",
@@ -226,7 +233,9 @@
         "forbidden": "Нет прав на редактирование.",
         "cannot_change_owner_role": "Для смены владельца используйте передачу владения.",
         "use_transfer_ownership": "Используйте «Сделать владельцем семьи».",
-        "db_unavailable": "База временно недоступна. Попробуйте ещё раз."
+        "db_unavailable": "База временно недоступна. Попробуйте ещё раз.",
+        "owner_must_transfer": "Сначала передайте владение, потом выходите из семьи.",
+        "rate_limited": "Слишком много попыток. Попробуйте позже."
       }
     },
     "notes": {
@@ -377,7 +386,17 @@
       "createSubmitting": "Создаём…",
       "joinSubmit": "Присоединиться",
       "joinSubmitting": "Присоединяем…",
-      "back": "Назад"
+      "back": "Назад",
+      "errors": {
+        "not_authenticated": "Войдите снова.",
+        "family_name_required": "Введите название семьи.",
+        "invite_code_required": "Введите код приглашения.",
+        "user_not_found": "Не удалось загрузить аккаунт. Попробуйте ещё раз.",
+        "already_in_family": "Вы уже состоите в семье.",
+        "invalid_invite_code": "Неверный код приглашения.",
+        "rate_limited": "Слишком много попыток. Попробуйте позже.",
+        "db_unavailable": "База временно недоступна. Попробуйте ещё раз."
+      }
     },
     "voiceChat": {
       "assistantName": "Охана",

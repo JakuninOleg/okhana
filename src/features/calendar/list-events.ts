@@ -1,4 +1,5 @@
 import { and, asc, eq, gte, lte } from 'drizzle-orm';
+import { loadActiveFamilyMember } from '@/lib/server/family/assert-family-member';
 import { db } from '@/lib/server/db';
 import { withDbRetry } from '@/lib/server/db/client';
 import { events } from '@/lib/server/db/schema';
@@ -60,11 +61,16 @@ type CreateEventInput = {
 export async function createFamilyEvent(
   input: CreateEventInput,
 ): Promise<{ id: number }> {
+  const member = await loadActiveFamilyMember(input.createdBy, input.familyId);
+  if (!member) {
+    throw new Error('Creator is not in this family');
+  }
+
   return withDbRetry(async () => {
     const [row] = await db
       .insert(events)
       .values({
-        familyId: input.familyId,
+        familyId: member.familyId,
         createdBy: input.createdBy,
         title: input.title,
         description: input.description?.trim() || null,

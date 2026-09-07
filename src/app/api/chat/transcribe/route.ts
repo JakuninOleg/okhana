@@ -1,5 +1,6 @@
 import { auth } from '@clerk/nextjs/server';
 import { goAiAudioTranscriptions, getGoAiConfig, readGoAiSafeError } from '@/features/ai/go-ai-client';
+import { consumeRateLimit } from '@/lib/server/rate-limit';
 
 export const runtime = 'nodejs';
 
@@ -19,6 +20,18 @@ export async function POST(request: Request): Promise<Response> {
   const { userId } = await auth();
   if (!userId) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const rate = consumeRateLimit({
+    key: `stt:${userId}`,
+    limit: 20,
+    windowMs: 60_000,
+  });
+  if (!rate.ok) {
+    return Response.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rate.retryAfterSec) } },
+    );
   }
 
   try {

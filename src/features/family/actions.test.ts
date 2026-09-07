@@ -6,6 +6,7 @@ const mockAuth = vi.hoisted(() => vi.fn());
 // Mock revalidatePath — no-op, asserted on success
 const mockRevalidatePath = vi.hoisted(() => vi.fn());
 const mockInvalidateDashboardFamilyCache = vi.hoisted(() => vi.fn());
+const mockInvalidateCachedChatContext = vi.hoisted(() => vi.fn());
 
 // Mock generateInviteCode — deterministic for happy-path assertions
 const mockGenerateInviteCode = vi.hoisted(() => vi.fn());
@@ -15,31 +16,42 @@ vi.mock('@/features/family/get-dashboard-family', () => ({
   invalidateDashboardFamilyCache: (...args: unknown[]) => mockInvalidateDashboardFamilyCache(...args),
 }));
 
+vi.mock('@/features/chat/chat-context-cache', () => ({
+  invalidateCachedChatContext: (...args: unknown[]) => mockInvalidateCachedChatContext(...args),
+}));
+
 vi.mock('@/lib/server/users/ensure-db-user', () => ({
   ensureDbUser: (...args: unknown[]) => mockEnsureDbUser(...args),
 }));
 
+vi.mock('@/lib/server/rate-limit', () => ({
+  consumeRateLimit: () => ({ ok: true, retryAfterSec: 0 }),
+}));
+
+vi.mock('@/lib/server/db/client', () => ({
+  withDbRetry: (operation: () => Promise<unknown>) => operation(),
+}));
+
 vi.mock('@/lib/server/db/schema', () => ({
   users: { id: 'id', clerkId: 'clerk_id', familyId: 'family_id', familyRole: 'family_role' },
-  families: { id: 'id', inviteCode: 'invite_code' },
+  families: { id: 'id', inviteCode: 'invite_code', ownerId: 'owner_id' },
 }));
 
 vi.mock('drizzle-orm', () => ({
   eq: vi.fn(),
+  and: vi.fn(),
 }));
 
-// Mock db — chainable select/insert/update. Each query builder records its
-// call so tests can assert which path was taken.
 const mockSelectLimit = vi.hoisted(() => vi.fn());
 const mockInsertReturning = vi.hoisted(() => vi.fn());
 const mockUpdateWhere = vi.hoisted(() => vi.fn());
+const mockUpdateReturning = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/server/db', () => ({
   db: {
     select: vi.fn(() => ({
       from: vi.fn(() => ({
         where: vi.fn(() => ({
-          // users lookup uses .limit(1)
           limit: vi.fn(() => mockSelectLimit()),
         })),
       })),
@@ -51,15 +63,19 @@ vi.mock('@/lib/server/db', () => ({
     })),
     update: vi.fn(() => ({
       set: vi.fn(() => ({
-        where: vi.fn(() => mockUpdateWhere()),
+        where: vi.fn((...args: unknown[]) => {
+          const chain = mockUpdateWhere(...args);
+          if (chain && typeof chain === 'object' && 'returning' in chain) {
+            return chain;
+          }
+          return {
+            returning: vi.fn(() => mockUpdateReturning()),
+          };
+        }),
       })),
     })),
   },
 }));
-
-// joinFamily runs a second select (families lookup). Both selects share the
-// select().from().where().limit() chain, resolved by mockSelectLimit — tests
-// use mockResolvedValueOnce to feed the user-lookup then the family-lookup.
 
 async function loadActions() {
   vi.doMock('@clerk/nextjs/server', () => ({
@@ -71,7 +87,6 @@ async function loadActions() {
   vi.doMock('@/lib/server/utils', () => ({
     generateInviteCode: () => mockGenerateInviteCode(),
   }));
-  // Fresh import so vi.mock hoisting + clearAllMocks compose predictably
   return await import('./actions');
 }
 
@@ -87,44 +102,48 @@ describe('createFamily', () => {
     mockGenerateInviteCode.mockReturnValue('ABCD2345');
   });
 
-  it('throws when the user is not authenticated', async () => {
+  it('returns error when the user is not authenticated', async () => {
     mockAuth.mockResolvedValue({ userId: null });
     const { createFamily } = await loadActions();
 
-    await expect(createFamily(formData({ name: 'Smiths' }))).rejects.toThrow(
-      'Not authenticated',
-    );
+    await expect(createFamily(formData({ name: 'Smiths' }))).resolves.toEqual({
+      ok: false,
+      error: 'not_authenticated',
+    });
     expect(mockEnsureDbUser).not.toHaveBeenCalled();
   });
 
-  it('throws when the family name is empty', async () => {
+  it('returns error when the family name is empty', async () => {
     mockAuth.mockResolvedValue({ userId: 'user_1' });
     const { createFamily } = await loadActions();
 
-    await expect(createFamily(formData({ name: '' }))).rejects.toThrow(
-      'Family name is required',
-    );
+    await expect(createFamily(formData({ name: '' }))).resolves.toEqual({
+      ok: false,
+      error: 'family_name_required',
+    });
     expect(mockEnsureDbUser).not.toHaveBeenCalled();
   });
 
-  it('throws when the user is not found in the database', async () => {
+  it('returns error when the user is not found in the database', async () => {
     mockAuth.mockResolvedValue({ userId: 'user_1' });
     mockEnsureDbUser.mockResolvedValue(null);
     const { createFamily } = await loadActions();
 
-    await expect(createFamily(formData({ name: 'Smiths' }))).rejects.toThrow(
-      'User not found',
-    );
+    await expect(createFamily(formData({ name: 'Smiths' }))).resolves.toEqual({
+      ok: false,
+      error: 'user_not_found',
+    });
   });
 
-  it('throws when the user already belongs to a family', async () => {
+  it('returns error when the user already belongs to a family', async () => {
     mockAuth.mockResolvedValue({ userId: 'user_1' });
     mockEnsureDbUser.mockResolvedValue({ id: 1, familyId: 5 });
     const { createFamily } = await loadActions();
 
-    await expect(createFamily(formData({ name: 'Smiths' }))).rejects.toThrow(
-      'You already belong to a family',
-    );
+    await expect(createFamily(formData({ name: 'Smiths' }))).resolves.toEqual({
+      ok: false,
+      error: 'already_in_family',
+    });
     expect(mockInsertReturning).not.toHaveBeenCalled();
   });
 
@@ -135,16 +154,13 @@ describe('createFamily', () => {
     mockUpdateWhere.mockResolvedValue(undefined);
     const { createFamily } = await loadActions();
 
-    await createFamily(formData({ name: '  Smiths  ' }));
+    await expect(createFamily(formData({ name: '  Smiths  ' }))).resolves.toEqual({ ok: true });
 
-    // Invite code generated
     expect(mockGenerateInviteCode).toHaveBeenCalledOnce();
-    // Family inserted
     expect(mockInsertReturning).toHaveBeenCalledOnce();
-    // User updated to owner
     expect(mockUpdateWhere).toHaveBeenCalledOnce();
-    // Dashboard revalidated
     expect(mockInvalidateDashboardFamilyCache).toHaveBeenCalledWith('user_1');
+    expect(mockInvalidateCachedChatContext).toHaveBeenCalledWith('user_1');
     expect(mockRevalidatePath).toHaveBeenCalledWith(
       '/[locale]/dashboard',
       'page',
@@ -153,50 +169,52 @@ describe('createFamily', () => {
 });
 
 describe('joinFamily', () => {
-  // joinFamily performs two selects: users lookup then families lookup.
-  // mockSelectLimit serves both sequentially via mockResolvedValueOnce.
   beforeEach(() => {
     vi.clearAllMocks();
     mockGenerateInviteCode.mockReturnValue('ABCD2345');
   });
 
-  it('throws when the user is not authenticated', async () => {
+  it('returns error when the user is not authenticated', async () => {
     mockAuth.mockResolvedValue({ userId: null });
     const { joinFamily } = await loadActions();
 
-    await expect(joinFamily(formData({ inviteCode: 'ABCD2345' }))).rejects.toThrow(
-      'Not authenticated',
-    );
+    await expect(joinFamily(formData({ inviteCode: 'ABCD2345' }))).resolves.toEqual({
+      ok: false,
+      error: 'not_authenticated',
+    });
   });
 
-  it('throws when the invite code is empty', async () => {
+  it('returns error when the invite code is empty', async () => {
     mockAuth.mockResolvedValue({ userId: 'user_1' });
     const { joinFamily } = await loadActions();
 
-    await expect(joinFamily(formData({ inviteCode: '' }))).rejects.toThrow(
-      'Invite code is required',
-    );
+    await expect(joinFamily(formData({ inviteCode: '' }))).resolves.toEqual({
+      ok: false,
+      error: 'invite_code_required',
+    });
   });
 
-  it('throws when the user already belongs to a family', async () => {
+  it('returns error when the user already belongs to a family', async () => {
     mockAuth.mockResolvedValue({ userId: 'user_1' });
     mockEnsureDbUser.mockResolvedValue({ id: 1, familyId: 5 });
     const { joinFamily } = await loadActions();
 
-    await expect(joinFamily(formData({ inviteCode: 'ABCD2345' }))).rejects.toThrow(
-      'You already belong to a family',
-    );
+    await expect(joinFamily(formData({ inviteCode: 'ABCD2345' }))).resolves.toEqual({
+      ok: false,
+      error: 'already_in_family',
+    });
   });
 
-  it('throws when the invite code does not match any family', async () => {
+  it('returns error when the invite code does not match any family', async () => {
     mockAuth.mockResolvedValue({ userId: 'user_1' });
     mockEnsureDbUser.mockResolvedValue({ id: 1, familyId: null });
     mockSelectLimit.mockResolvedValueOnce([]);
     const { joinFamily } = await loadActions();
 
-    await expect(joinFamily(formData({ inviteCode: 'nope1234' }))).rejects.toThrow(
-      'Invalid invite code',
-    );
+    await expect(joinFamily(formData({ inviteCode: 'nope1234' }))).resolves.toEqual({
+      ok: false,
+      error: 'invalid_invite_code',
+    });
     expect(mockUpdateWhere).not.toHaveBeenCalled();
   });
 
@@ -207,11 +225,11 @@ describe('joinFamily', () => {
     mockUpdateWhere.mockResolvedValue(undefined);
     const { joinFamily } = await loadActions();
 
-    // Lowercase input is normalised to uppercase before lookup
-    await joinFamily(formData({ inviteCode: 'abcd2345' }));
+    await expect(joinFamily(formData({ inviteCode: 'abcd2345' }))).resolves.toEqual({ ok: true });
 
     expect(mockUpdateWhere).toHaveBeenCalledOnce();
     expect(mockInvalidateDashboardFamilyCache).toHaveBeenCalledWith('user_1');
+    expect(mockInvalidateCachedChatContext).toHaveBeenCalledWith('user_1');
     expect(mockRevalidatePath).toHaveBeenCalledWith(
       '/[locale]/dashboard',
       'page',

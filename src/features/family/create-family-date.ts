@@ -1,4 +1,5 @@
 import { isValidMonthDay, type FamilyDateKind } from '@/features/family/family-date-utils';
+import { loadActiveFamilyMember } from '@/lib/server/family/assert-family-member';
 import { db } from '@/lib/server/db';
 import { withDbRetry } from '@/lib/server/db/client';
 import { familyDates } from '@/lib/server/db/schema';
@@ -31,11 +32,16 @@ export async function createFamilyDate(
     throw new Error('Invalid month/day for memorable date');
   }
 
+  const member = await loadActiveFamilyMember(input.createdBy, input.familyId);
+  if (!member) {
+    throw new Error('Creator is not in this family');
+  }
+
   const [row] = await withDbRetry(async () =>
     db
       .insert(familyDates)
       .values({
-        familyId: input.familyId,
+        familyId: member.familyId,
         title: input.title,
         kind: input.kind,
         month: input.month,

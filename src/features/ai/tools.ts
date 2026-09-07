@@ -27,6 +27,7 @@ import {
   createFamilyEvent,
   listEventsInRange,
 } from '@/features/calendar/list-events';
+import { loadActiveFamilyMember } from '@/lib/server/family/assert-family-member';
 
 type FamilyRole = 'owner' | 'adult' | 'child';
 
@@ -317,10 +318,21 @@ function parseToolArguments(raw: string): unknown {
 }
 
 export async function executeAiTool(
-  input: BuildAiToolsInput,
+  rawInput: BuildAiToolsInput,
   name: string,
   rawArguments: string,
 ): Promise<unknown> {
+  // Never trust cached familyId/role for mutations — re-check live membership.
+  const member = await loadActiveFamilyMember(rawInput.userId, rawInput.familyId);
+  if (!member) {
+    return { error: 'Not a family member' };
+  }
+  const input: BuildAiToolsInput = {
+    ...rawInput,
+    familyId: member.familyId,
+    familyRole: member.familyRole,
+  };
+
   const args = parseToolArguments(rawArguments);
 
   if (name === 'remember_note') {
