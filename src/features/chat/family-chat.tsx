@@ -8,10 +8,7 @@ import { Button } from '@/components/ui/button';
 import {
   Card,
   CardContent,
-  CardDescription,
   CardFooter,
-  CardHeader,
-  CardTitle,
 } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -356,6 +353,10 @@ export function FamilyChat(): React.JSX.Element {
 
   const busy = status === 'streaming' || voice.phase === 'transcribing';
   const recording = voice.phase === 'recording' || voice.phase === 'warning';
+  const showStatusChrome =
+    busy
+    || recording
+    || status === 'loadingHistory';
 
   const statusLine =
     voice.phase === 'transcribing'
@@ -368,7 +369,7 @@ export function FamilyChat(): React.JSX.Element {
             ? t('statusThinking')
             : status === 'loadingHistory'
               ? t('loadingHistory')
-              : t('statusReady');
+              : null;
 
   return (
     <TooltipProvider>
@@ -380,36 +381,25 @@ export function FamilyChat(): React.JSX.Element {
           'min-h-[28rem] max-h-[min(85dvh,52rem)] overflow-hidden lg:max-h-none lg:min-h-0',
         )}
       >
-        <CardHeader className="shrink-0 gap-3 border-b border-border/70 px-4 py-3 dark:border-border sm:px-5 sm:py-4">
-          <div className="flex items-start gap-3">
-            <OkhanaAvatar size="lg" label={t('assistantName')} />
-            <div className="min-w-0 flex-1 space-y-2">
-              <div className="space-y-1">
-                <p className="text-[0.7rem] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-                  {t('eyebrow')}
-                </p>
-                <CardTitle className="text-lg leading-snug tracking-tight text-balance sm:text-xl">
-                  {t('title')}
-                </CardTitle>
-                <CardDescription className="hidden sm:block">{t('description')}</CardDescription>
-                <p className="text-[0.7rem] leading-snug text-muted-foreground/90 sm:text-xs">
-                  {t('trustHint')}
-                </p>
+        {locale === 'en' || showStatusChrome ? (
+          <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border/70 px-4 py-2 dark:border-border sm:px-5">
+            {locale === 'en' ? (
+              <div className="flex w-fit max-w-full items-center gap-2 rounded-xl border border-border/60 bg-muted/30 px-2.5 py-1.5">
+                <Volume2 className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                <Label htmlFor="okhana-tts-toggle" className="text-xs text-muted-foreground">
+                  {t('ttsToggle')}
+                </Label>
+                <Switch
+                  id="okhana-tts-toggle"
+                  checked={ttsEnabled}
+                  onCheckedChange={(checked) => setTtsEnabled(checked, 'en')}
+                  aria-label={t('ttsToggle')}
+                />
               </div>
-              {locale === 'en' ? (
-                <div className="flex w-fit max-w-full items-center gap-2 rounded-xl border border-border/60 bg-muted/30 px-2.5 py-1.5">
-                  <Volume2 className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-                  <Label htmlFor="okhana-tts-toggle" className="text-xs text-muted-foreground">
-                    {t('ttsToggle')}
-                  </Label>
-                  <Switch
-                    id="okhana-tts-toggle"
-                    checked={ttsEnabled}
-                    onCheckedChange={(checked) => setTtsEnabled(checked, 'en')}
-                    aria-label={t('ttsToggle')}
-                  />
-                </div>
-              ) : null}
+            ) : (
+              <span />
+            )}
+            {showStatusChrome && statusLine ? (
               <div className="flex flex-wrap items-center gap-2">
                 <p className="text-xs text-muted-foreground" aria-live="polite">
                   {statusLine}
@@ -423,9 +413,11 @@ export function FamilyChat(): React.JSX.Element {
                   <Badge variant="outline">{t('ttsOnHint')}</Badge>
                 ) : null}
               </div>
-            </div>
+            ) : locale === 'en' && ttsEnabled ? (
+              <Badge variant="outline">{t('ttsOnHint')}</Badge>
+            ) : null}
           </div>
-        </CardHeader>
+        ) : null}
 
         <CardContent className="flex min-h-0 flex-1 flex-col overflow-hidden px-0 py-0">
           <div

@@ -247,9 +247,6 @@ export function FamilyNotesSheet(): React.JSX.Element {
         </SheetHeader>
 
         <div className="space-y-3 px-4 pt-4">
-          <p className="rounded-xl bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-            {t('trustHint')}
-          </p>
           <Button
             type="button"
             size="sm"
