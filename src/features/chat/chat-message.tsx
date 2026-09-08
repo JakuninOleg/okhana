@@ -10,6 +10,7 @@ import {
   deleteOwnChatMessageAction,
   editOwnChatMessageAction,
 } from '@/features/chat/chat-message-actions';
+import { formatAssistantChatText } from '@/features/chat/format-assistant-chat-text';
 import { cn } from '@/lib/utils';
 
 type ChatMessageProps = {
@@ -167,7 +168,9 @@ export function ChatMessage({
       <div className="min-w-0 flex-1 space-y-1.5">
         <p className="text-xs font-medium text-muted-foreground">{assistantName}</p>
         <div className="text-sm leading-relaxed whitespace-pre-wrap text-foreground">
-          {showThinking ? <ThinkingIndicator label={thinkingLabel} /> : content}
+          {showThinking
+            ? <ThinkingIndicator label={thinkingLabel} />
+            : formatAssistantChatText(content)}
         </div>
       </div>
     </div>

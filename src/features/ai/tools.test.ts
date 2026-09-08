@@ -3,10 +3,15 @@ import { executeAiTool, getAiToolDefinitions } from '@/features/ai/tools';
 
 const mockSaveNote = vi.hoisted(() => vi.fn());
 const mockSearchNotes = vi.hoisted(() => vi.fn());
+const mockUpdateVisibleNoteContent = vi.hoisted(() => vi.fn());
+const mockUpdateVisibleNotePrivacy = vi.hoisted(() => vi.fn());
+const mockDeleteVisibleNote = vi.hoisted(() => vi.fn());
 const mockCreateFamilyTask = vi.hoisted(() => vi.fn());
 const mockListVisibleTasks = vi.hoisted(() => vi.fn());
 const mockAcknowledge = vi.hoisted(() => vi.fn());
 const mockComplete = vi.hoisted(() => vi.fn());
+const mockUpdateFamilyTask = vi.hoisted(() => vi.fn());
+const mockCancelFamilyTask = vi.hoisted(() => vi.fn());
 const mockNotifyAssigned = vi.hoisted(() => vi.fn());
 const mockNotifyAcknowledged = vi.hoisted(() => vi.fn());
 const mockNotifyCompleted = vi.hoisted(() => vi.fn());
@@ -40,6 +45,12 @@ vi.mock('@/features/notes/search-notes', () => ({
   searchNotes: (...args: unknown[]) => mockSearchNotes(...args),
 }));
 
+vi.mock('@/features/notes/list-notes', () => ({
+  updateVisibleNoteContent: (...args: unknown[]) => mockUpdateVisibleNoteContent(...args),
+  updateVisibleNotePrivacy: (...args: unknown[]) => mockUpdateVisibleNotePrivacy(...args),
+  deleteVisibleNote: (...args: unknown[]) => mockDeleteVisibleNote(...args),
+}));
+
 vi.mock('@/features/calendar/list-events', () => ({
   createFamilyEvent: (...args: unknown[]) => mockCreateFamilyEvent(...args),
   listEventsInRange: (...args: unknown[]) => mockListEventsInRange(...args),
@@ -59,6 +70,11 @@ vi.mock('@/features/family/list-member-birthdays', () => ({
 
 vi.mock('@/features/tasks/create-task', () => ({
   createFamilyTask: (...args: unknown[]) => mockCreateFamilyTask(...args),
+}));
+
+vi.mock('@/features/tasks/manage-task', () => ({
+  updateFamilyTask: (...args: unknown[]) => mockUpdateFamilyTask(...args),
+  cancelFamilyTask: (...args: unknown[]) => mockCancelFamilyTask(...args),
 }));
 
 vi.mock('@/features/notifications/task-notifications', () => ({
@@ -93,10 +109,15 @@ describe('AI tools', () => {
   beforeEach(() => {
     mockSaveNote.mockReset();
     mockSearchNotes.mockReset();
+    mockUpdateVisibleNoteContent.mockReset();
+    mockUpdateVisibleNotePrivacy.mockReset();
+    mockDeleteVisibleNote.mockReset();
     mockCreateFamilyTask.mockReset();
     mockListVisibleTasks.mockReset();
     mockAcknowledge.mockReset();
     mockComplete.mockReset();
+    mockUpdateFamilyTask.mockReset();
+    mockCancelFamilyTask.mockReset();
     mockNotifyAssigned.mockReset();
     mockNotifyCompleted.mockReset();
     mockCreateFamilyEvent.mockReset();
@@ -117,21 +138,26 @@ describe('AI tools', () => {
     const tools = getAiToolDefinitions();
     expect(tools.map((tool) => tool.function.name).sort()).toEqual([
       'acknowledge_task',
+      'cancel_task',
       'complete_task',
       'create_event',
       'create_memorable_date',
       'create_task',
+      'delete_note',
       'list_events',
       'list_memorable_dates',
       'list_tasks',
       'remember_note',
       'search_notes',
+      'update_note',
+      'update_note_privacy',
+      'update_task',
     ]);
     expect(tools.every((tool) => tool.type === 'function')).toBe(true);
   });
 
   it('validates and executes remember_note in-app', async () => {
-    mockSaveNote.mockResolvedValue(undefined);
+    mockSaveNote.mockResolvedValue({ id: 77 });
 
     await expect(
       executeAiTool(
@@ -139,7 +165,7 @@ describe('AI tools', () => {
         'remember_note',
         JSON.stringify({ title: 'Milk', content: 'Buy 2L', category: 'reminder' }),
       ),
-    ).resolves.toEqual({ saved: true, title: 'Milk' });
+    ).resolves.toEqual({ saved: true, noteId: 77, title: 'Milk' });
 
     expect(mockSaveNote).toHaveBeenCalledWith({
       familyId: 1,
@@ -305,6 +331,71 @@ describe('AI tools', () => {
         JSON.stringify({ title: 'X', assigneeUserIds: [99] }),
       ),
     ).resolves.toEqual({ error: 'Assignees not in family: 99' });
+  });
+
+  it('updates and deletes notes via tools', async () => {
+    mockUpdateVisibleNoteContent.mockResolvedValue({ ok: true });
+    mockUpdateVisibleNotePrivacy.mockResolvedValue({ ok: true });
+    mockDeleteVisibleNote.mockResolvedValue({ ok: true });
+
+    await expect(
+      executeAiTool(
+        { familyId: 1, userId: 2, familyRole: 'owner' },
+        'update_note',
+        JSON.stringify({ noteId: 5, title: 'Passport', content: 'In the safe' }),
+      ),
+    ).resolves.toEqual({ updated: true, noteId: 5, title: 'Passport' });
+
+    await expect(
+      executeAiTool(
+        { familyId: 1, userId: 2, familyRole: 'owner' },
+        'update_note_privacy',
+        JSON.stringify({ noteId: 5, privacyLevel: 'adults_only', hiddenFrom: [3] }),
+      ),
+    ).resolves.toEqual({ updated: true, noteId: 5, privacyLevel: 'adults_only' });
+
+    await expect(
+      executeAiTool(
+        { familyId: 1, userId: 2, familyRole: 'owner' },
+        'delete_note',
+        JSON.stringify({ noteId: 5 }),
+      ),
+    ).resolves.toEqual({ deleted: true, noteId: 5 });
+  });
+
+  it('updates and cancels tasks via tools', async () => {
+    mockUpdateFamilyTask.mockResolvedValue({
+      ok: true,
+      taskId: 11,
+      title: 'Buy bread',
+      dueAt: '2026-09-11T10:00:00.000Z',
+    });
+    mockCancelFamilyTask.mockResolvedValue({ ok: true, taskId: 11 });
+
+    await expect(
+      executeAiTool(
+        { familyId: 1, userId: 2, familyRole: 'owner' },
+        'update_task',
+        JSON.stringify({
+          taskId: 11,
+          title: 'Buy bread',
+          dueAt: '2026-09-11T10:00:00.000Z',
+        }),
+      ),
+    ).resolves.toEqual({
+      updated: true,
+      taskId: 11,
+      title: 'Buy bread',
+      dueAt: '2026-09-11T10:00:00.000Z',
+    });
+
+    await expect(
+      executeAiTool(
+        { familyId: 1, userId: 2, familyRole: 'owner' },
+        'cancel_task',
+        JSON.stringify({ taskId: 11 }),
+      ),
+    ).resolves.toEqual({ cancelled: true, taskId: 11 });
   });
 
   it('acknowledges and completes tasks via tools', async () => {

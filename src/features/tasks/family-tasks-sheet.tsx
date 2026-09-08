@@ -1,8 +1,8 @@
 'use client';
 
-import { Check, Eye, ListTodo, Loader2, MessageSquarePlus, X } from 'lucide-react';
+import { Check, Eye, ListTodo, Loader2, MessageSquarePlus } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
-import { useCallback, useState, useTransition } from 'react';
+import { useCallback, useEffect, useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
@@ -35,13 +35,13 @@ function TaskDetailBody({
   onAck,
   onComplete,
   pending,
-  onClose,
+  onBack,
 }: {
   task: VisibleTask;
   onAck: (id: number) => void;
   onComplete: (id: number) => void;
   pending: boolean;
-  onClose: () => void;
+  onBack: () => void;
 }): React.JSX.Element {
   const t = useTranslations('Dashboard.tasks');
   const locale = useLocale();
@@ -50,16 +50,20 @@ function TaskDetailBody({
 
   return (
     <div className="flex flex-col gap-4 px-4 pb-6 pt-2">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 space-y-1">
-          <h3 className="text-base font-semibold text-foreground">{task.title}</h3>
-          {task.description ? (
-            <p className="text-sm text-muted-foreground">{task.description}</p>
-          ) : null}
-        </div>
-        <Button type="button" size="icon-sm" variant="ghost" onClick={onClose} aria-label={t('detailClose')}>
-          <X className="size-4" />
+      <div className="space-y-1">
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          className="-ml-2 h-8 px-2 text-muted-foreground"
+          onClick={onBack}
+        >
+          {t('detailBack')}
         </Button>
+        <h3 className="text-base font-semibold text-foreground">{task.title}</h3>
+        {task.description ? (
+          <p className="text-sm text-muted-foreground">{task.description}</p>
+        ) : null}
       </div>
 
       <dl className="space-y-2 rounded-2xl border border-border/60 bg-muted/20 px-3 py-3 text-sm">
@@ -214,9 +218,22 @@ function TaskRow({
   );
 }
 
-export function FamilyTasksSheet(): React.JSX.Element {
+export type FamilyTasksSheetProps = {
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  /** When the sheet opens, jump straight to this task's detail. */
+  focusTaskId?: number | null;
+};
+
+export function FamilyTasksSheet({
+  open: openProp,
+  onOpenChange: onOpenChangeProp,
+  focusTaskId = null,
+}: FamilyTasksSheetProps): React.JSX.Element {
   const t = useTranslations('Dashboard.tasks');
-  const [open, setOpen] = useState(false);
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const open = openProp ?? uncontrolledOpen;
+  const setOpen = onOpenChangeProp ?? setUncontrolledOpen;
   const [scope, setScope] = useState<'active' | 'completed'>('active');
   const [tasks, setTasks] = useState<VisibleTask[]>([]);
   const [detailTask, setDetailTask] = useState<VisibleTask | null>(null);
@@ -224,7 +241,10 @@ export function FamilyTasksSheet(): React.JSX.Element {
   const [loading, setLoading] = useState(false);
   const [pending, startTransition] = useTransition();
 
-  const refresh = useCallback(async (nextScope: 'active' | 'completed') => {
+  const refresh = useCallback(async (
+    nextScope: 'active' | 'completed',
+    preferredDetailId?: number | null,
+  ) => {
     setLoading(true);
     setError(null);
     const result = await loadMyTasksAction(nextScope);
@@ -235,16 +255,32 @@ export function FamilyTasksSheet(): React.JSX.Element {
       return;
     }
     setTasks(result.tasks);
+    if (preferredDetailId != null) {
+      setDetailTask(result.tasks.find((task) => task.id === preferredDetailId) ?? null);
+      return;
+    }
     setDetailTask((current) => {
       if (!current) return null;
       return result.tasks.find((task) => task.id === current.id) ?? null;
     });
   }, []);
 
+  useEffect(() => {
+    if (!open || focusTaskId == null) {
+      return;
+    }
+    // Defer setState — sync setState in effect trips react-hooks/set-state-in-effect.
+    const timer = window.setTimeout(() => {
+      setScope('active');
+      void refresh('active', focusTaskId);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [open, focusTaskId, refresh]);
+
   function handleOpenChange(next: boolean): void {
     setOpen(next);
     if (next) {
-      void refresh(scope);
+      void refresh(scope, focusTaskId);
     } else {
       setDetailTask(null);
     }
@@ -263,7 +299,7 @@ export function FamilyTasksSheet(): React.JSX.Element {
         setError(result.error);
         return;
       }
-      await refresh(scope);
+      await refresh(scope, detailTask?.id ?? null);
     });
   }
 
@@ -274,7 +310,7 @@ export function FamilyTasksSheet(): React.JSX.Element {
         setError(result.error);
         return;
       }
-      await refresh(scope);
+      await refresh(scope, detailTask?.id ?? null);
     });
   }
 
@@ -309,7 +345,7 @@ export function FamilyTasksSheet(): React.JSX.Element {
               onAck={onAck}
               onComplete={onComplete}
               pending={pending}
-              onClose={() => setDetailTask(null)}
+              onBack={() => setDetailTask(null)}
             />
           </div>
         ) : (
