@@ -17,6 +17,7 @@ import { HubToolbarIcon, HubToolbarLabel, hubToolbarTriggerClassName } from '@/f
 import {
   deleteNoteAction,
   loadVisibleNotesAction,
+  updateNoteContentAction,
   updateNotePrivacyAction,
   type NoteActionError,
   type NoteMemberOption,
@@ -38,6 +39,7 @@ function NoteRow({
   pending,
   onDelete,
   onSavePrivacy,
+  onSaveContent,
 }: {
   note: VisibleNote;
   canManage: boolean;
@@ -49,12 +51,17 @@ function NoteRow({
     privacyLevel: PrivacyLevel;
     hiddenFrom: number[];
   }) => void;
+  onSaveContent: (input: { noteId: number; title: string; content: string }) => Promise<boolean>;
 }): React.JSX.Element {
   const t = useTranslations('Dashboard.notes');
   const locale = useLocale();
   const [privacyLevel, setPrivacyLevel] = useState<PrivacyLevel>(note.privacyLevel);
   const [hiddenFrom, setHiddenFrom] = useState<number[]>(note.hiddenFrom ?? []);
   const [editing, setEditing] = useState(false);
+  const [editingContent, setEditingContent] = useState(false);
+  const [draftTitle, setDraftTitle] = useState(note.title);
+  const [draftContent, setDraftContent] = useState(note.content);
+  const [contentPending, startContentTransition] = useTransition();
 
   function toggleHidden(memberId: number): void {
     setHiddenFrom((prev) =>
@@ -66,17 +73,91 @@ function NoteRow({
     <li className="rounded-2xl border border-border/60 bg-background/70 px-3 py-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1 space-y-1">
-          <p className="text-sm font-medium text-foreground">{note.title}</p>
-          <p className="text-sm whitespace-pre-wrap text-muted-foreground">{note.content}</p>
+          {editingContent ? (
+            <div className="space-y-2">
+              <input
+                className="w-full rounded-lg border border-border bg-background px-2 py-1.5 text-sm"
+                value={draftTitle}
+                onChange={(event) => setDraftTitle(event.target.value)}
+                aria-label={t('editTitleLabel')}
+              />
+              <textarea
+                className="min-h-24 w-full rounded-lg border border-border bg-background px-2 py-1.5 text-sm"
+                value={draftContent}
+                onChange={(event) => setDraftContent(event.target.value)}
+                aria-label={t('editContentLabel')}
+              />
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={pending || contentPending}
+                  onClick={() => {
+                    startContentTransition(async () => {
+                      const ok = await onSaveContent({
+                        noteId: note.id,
+                        title: draftTitle,
+                        content: draftContent,
+                      });
+                      if (ok) {
+                        setEditingContent(false);
+                      }
+                    });
+                  }}
+                >
+                  {t('contentSave')}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  disabled={contentPending}
+                  onClick={() => {
+                    setDraftTitle(note.title);
+                    setDraftContent(note.content);
+                    setEditingContent(false);
+                  }}
+                >
+                  {t('privacyCancel')}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <p className="text-sm font-medium text-foreground">{note.title}</p>
+              <p className="text-sm whitespace-pre-wrap text-muted-foreground">{note.content}</p>
+            </>
+          )}
           <p className="text-xs text-muted-foreground">
             {[
+              note.createdBy != null
+                ? t('createdBy', {
+                  name: members.find((member) => member.id === note.createdBy)?.label ?? '—',
+                })
+                : null,
               t(`category.${note.category}`),
               t(`privacy.${note.privacyLevel}`),
               formatCreatedAt(note.createdAt, locale),
-            ].join(' · ')}
+            ].filter(Boolean).join(' · ')}
           </p>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
+          {canManage && !editingContent ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              disabled={pending}
+              onClick={() => {
+                setEditingContent(true);
+                setEditing(false);
+                setDraftTitle(note.title);
+                setDraftContent(note.content);
+              }}
+            >
+              {t('contentEdit')}
+            </Button>
+          ) : null}
           {canManage ? (
             <Button
               type="button"
@@ -222,6 +303,21 @@ export function FamilyNotesSheet(): React.JSX.Element {
     });
   }
 
+  async function onSaveContent(input: {
+    noteId: number;
+    title: string;
+    content: string;
+  }): Promise<boolean> {
+    setError(null);
+    const result = await updateNoteContentAction(input);
+    if (!result.ok) {
+      setError(t(`errors.${result.error}`));
+      return false;
+    }
+    await refresh();
+    return true;
+  }
+
   return (
     <Sheet
       open={open}
@@ -292,6 +388,7 @@ export function FamilyNotesSheet(): React.JSX.Element {
                     pending={pending}
                     onDelete={onDelete}
                     onSavePrivacy={onSavePrivacy}
+                    onSaveContent={onSaveContent}
                   />
                 );
               })}

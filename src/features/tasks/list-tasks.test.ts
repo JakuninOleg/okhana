@@ -9,9 +9,11 @@ import {
 function assignment(
   userId: number,
   status: TaskAssigneeView['status'],
+  label = `User ${userId}`,
 ): TaskAssigneeView {
   return {
     userId,
+    label,
     status,
     seenAt: status === 'pending' ? null : '2026-09-01T10:00:00.000Z',
     doneAt: status === 'done' ? '2026-09-02T10:00:00.000Z' : null,
@@ -23,6 +25,7 @@ function task(partial: Partial<VisibleTask> & Pick<VisibleTask, 'id' | 'title'>)
     description: null,
     dueAt: null,
     createdBy: 1,
+    creatorLabel: 'Creator',
     createdAt: '2026-09-01T09:00:00.000Z',
     cancelledAt: null,
     isCreator: false,
@@ -36,6 +39,11 @@ describe('mapTaskRowsToVisible', () => {
   it('marks creator and attaches the viewer assignee row', () => {
     const mapped = mapTaskRowsToVisible({
       userId: 2,
+      labelsByUserId: new Map([
+        [1, 'Oleg'],
+        [2, 'Darya'],
+        [3, 'Sofia'],
+      ]),
       taskRows: [
         {
           id: 10,
@@ -67,8 +75,10 @@ describe('mapTaskRowsToVisible', () => {
 
     expect(mapped).toHaveLength(1);
     expect(mapped[0].isCreator).toBe(false);
+    expect(mapped[0].creatorLabel).toBe('Oleg');
     expect(mapped[0].myAssignment).toEqual({
       userId: 2,
+      label: 'Darya',
       status: 'pending',
       seenAt: null,
       doneAt: null,
@@ -80,6 +90,10 @@ describe('mapTaskRowsToVisible', () => {
   it('sets isCreator when the viewer created the task without being assigned', () => {
     const mapped = mapTaskRowsToVisible({
       userId: 1,
+      labelsByUserId: new Map([
+        [1, 'Oleg'],
+        [2, 'Darya'],
+      ]),
       taskRows: [
         {
           id: 11,
@@ -105,6 +119,7 @@ describe('mapTaskRowsToVisible', () => {
     expect(mapped[0].isCreator).toBe(true);
     expect(mapped[0].myAssignment).toBeNull();
     expect(mapped[0].assignees[0].userId).toBe(2);
+    expect(mapped[0].assignees[0].label).toBe('Darya');
   });
 });
 

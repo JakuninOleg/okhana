@@ -147,6 +147,91 @@ async function loadChatContextFromDb(clerkUserId: string): Promise<ChatContextOk
   });
 }
 
+async function resolveConversationId(input: {
+  clerkUserId: string;
+  familyId: number;
+  userId: number;
+  conversationId: number | null;
+}): Promise<number> {
+  if (input.conversationId != null) {
+    return input.conversationId;
+  }
+
+  const [existingConversation] = await db
+    .select()
+    .from(aiConversations)
+    .where(and(
+      eq(aiConversations.familyId, input.familyId),
+      eq(aiConversations.userId, input.userId),
+    ))
+    .orderBy(desc(aiConversations.updatedAt))
+    .limit(1);
+  const conversationId = existingConversation?.id ?? (await db
+    .insert(aiConversations)
+    .values({ familyId: input.familyId, userId: input.userId, title: 'AI chat' })
+    .returning())[0].id;
+
+  const cached = getCachedChatContext(input.clerkUserId);
+  if (cached) {
+    setCachedChatContext(input.clerkUserId, {
+      ...cached,
+      conversationId,
+      isNewConversation: false,
+    });
+  }
+
+  return conversationId;
+}
+
+/** Persist the user turn before streaming so the client can edit/delete via DB id. */
+async function persistUserMessage(input: {
+  clerkUserId: string;
+  familyId: number;
+  userId: number;
+  conversationId: number | null;
+  lastUserText: string;
+}): Promise<{ conversationId: number; messageId: number }> {
+  return withDbRetry(async () => {
+    const conversationId = await resolveConversationId(input);
+    const [row] = await db
+      .insert(aiChatMessages)
+      .values({
+        conversationId,
+        role: 'user',
+        content: truncateText(input.lastUserText, MAX_STORED_MESSAGE_CHARS),
+      })
+      .returning({ id: aiChatMessages.id });
+    await db
+      .update(aiConversations)
+      .set({ updatedAt: new Date() })
+      .where(eq(aiConversations.id, conversationId));
+    return { conversationId, messageId: row.id };
+  });
+}
+
+async function persistAssistantMessage(input: {
+  conversationId: number;
+  assistantText: string;
+}): Promise<void> {
+  const text = input.assistantText.trim();
+  if (!text) {
+    return;
+  }
+
+  await withDbRetry(async () => {
+    await db.insert(aiChatMessages).values({
+      conversationId: input.conversationId,
+      role: 'assistant',
+      content: truncateText(text, MAX_STORED_MESSAGE_CHARS),
+    });
+    await db
+      .update(aiConversations)
+      .set({ updatedAt: new Date() })
+      .where(eq(aiConversations.id, input.conversationId));
+  });
+}
+
+/** Fallback when the pre-stream user insert failed — persist both sides. */
 async function persistTurn(input: {
   clerkUserId: string;
   familyId: number;
@@ -156,28 +241,7 @@ async function persistTurn(input: {
   assistantText: string;
 }): Promise<void> {
   await withDbRetry(async () => {
-    let conversationId = input.conversationId;
-    if (conversationId == null) {
-      const [existingConversation] = await db
-        .select()
-        .from(aiConversations)
-        .where(and(
-          eq(aiConversations.familyId, input.familyId),
-          eq(aiConversations.userId, input.userId),
-        ))
-        .orderBy(desc(aiConversations.updatedAt))
-        .limit(1);
-      conversationId = existingConversation?.id ?? (await db
-        .insert(aiConversations)
-        .values({ familyId: input.familyId, userId: input.userId, title: 'AI chat' })
-        .returning())[0].id;
-
-      const cached = getCachedChatContext(input.clerkUserId);
-      if (cached) {
-        setCachedChatContext(input.clerkUserId, { ...cached, conversationId, isNewConversation: false });
-      }
-    }
-
+    const conversationId = await resolveConversationId(input);
     const now = new Date();
     if (input.lastUserText) {
       await db.insert(aiChatMessages).values({
@@ -300,6 +364,26 @@ export async function POST(request: Request): Promise<Response> {
     })),
   ];
 
+  let persistedUserMessageId: number | null = null;
+  let conversationIdForTurn = context.conversationId;
+  let userMessagePersistedEarly = false;
+  if (lastUserText) {
+    try {
+      const persisted = await persistUserMessage({
+        clerkUserId,
+        familyId: context.familyId,
+        userId: context.userId,
+        conversationId: context.conversationId,
+        lastUserText,
+      });
+      persistedUserMessageId = persisted.messageId;
+      conversationIdForTurn = persisted.conversationId;
+      userMessagePersistedEarly = true;
+    } catch {
+      // Best-effort — stream still continues; onComplete falls back to persistTurn.
+    }
+  }
+
   const streamResponse = createChatWithToolsStream({
     messages: modelMessages,
     emptyAssistantFallback: locale === 'ru'
@@ -313,11 +397,18 @@ export async function POST(request: Request): Promise<Response> {
     },
     signal: request.signal,
     onComplete: async ({ text }) => {
-      const latest = contextFromCache(clerkUserId) ?? context;
-      if (!latest) {
-        return;
-      }
       try {
+        if (userMessagePersistedEarly && conversationIdForTurn != null) {
+          await persistAssistantMessage({
+            conversationId: conversationIdForTurn,
+            assistantText: text,
+          });
+          return;
+        }
+        const latest = contextFromCache(clerkUserId) ?? context;
+        if (!latest) {
+          return;
+        }
         await persistTurn({
           clerkUserId,
           familyId: latest.familyId,
@@ -339,6 +430,9 @@ export async function POST(request: Request): Promise<Response> {
   headers.set('X-Okhana-Quota-User-Remaining', String(snapshot.userRemaining));
   headers.set('X-Okhana-Quota-Family-Limit', String(snapshot.familyLimit));
   headers.set('X-Okhana-Quota-User-Limit', String(snapshot.userLimit));
+  if (persistedUserMessageId != null) {
+    headers.set('X-Okhana-User-Message-Id', String(persistedUserMessageId));
+  }
 
   return new Response(streamResponse.body, {
     status: streamResponse.status,

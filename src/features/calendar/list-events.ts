@@ -12,6 +12,7 @@ export type FamilyEventRecord = {
   endTime: Date | null;
   allDay: boolean;
   createdBy: number | null;
+  participantUserIds: number[] | null;
 };
 
 type ListEventsInRangeInput = {
@@ -35,6 +36,7 @@ export async function listEventsInRange(
       endTime: events.endTime,
       allDay: events.allDay,
       createdBy: events.createdBy,
+      participantUserIds: events.participantUserIds,
     })
     .from(events)
     .where(
@@ -56,14 +58,26 @@ type CreateEventInput = {
   startTime: Date;
   endTime?: Date | null;
   allDay?: boolean;
+  /** Who the event is addressed to — targeted push when set. */
+  participantUserIds?: number[];
 };
 
 export async function createFamilyEvent(
   input: CreateEventInput,
-): Promise<{ id: number }> {
+): Promise<{ id: number; participantUserIds: number[] }> {
   const member = await loadActiveFamilyMember(input.createdBy, input.familyId);
   if (!member) {
     throw new Error('Creator is not in this family');
+  }
+
+  const participants = [...new Set((input.participantUserIds ?? []).filter((id) => id > 0))];
+
+  if (participants.length > 0) {
+    const { assertUsersShareFamily } = await import('@/lib/server/family/assert-family-member');
+    const ok = await assertUsersShareFamily(participants, member.familyId);
+    if (!ok) {
+      throw new Error('Participants must be in the same family');
+    }
   }
 
   return withDbRetry(async () => {
@@ -77,13 +91,14 @@ export async function createFamilyEvent(
         startTime: input.startTime,
         endTime: input.endTime ?? null,
         allDay: input.allDay ?? false,
+        participantUserIds: participants.length > 0 ? participants : null,
       })
       .returning({ id: events.id });
 
     if (!row) {
       throw new Error('Failed to create event');
     }
-    return { id: row.id };
+    return { id: row.id, participantUserIds: participants };
   });
 }
 

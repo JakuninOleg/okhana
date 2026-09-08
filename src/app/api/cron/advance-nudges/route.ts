@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { runAdvanceNudges } from '@/features/notifications/run-advance-nudges';
 import { runDailyBriefings } from '@/features/notifications/run-daily-briefings';
+import { runTaskReminders } from '@/features/notifications/run-task-reminders';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -18,7 +19,7 @@ function authorizeCron(request: Request): Response | null {
 }
 
 /**
- * Morning job (06:00 UTC ≈ 09:00 MSK): advance 7/3/1 nudges + morning briefing.
+ * Morning job (06:00 UTC ≈ 09:00 MSK): advance 7/3/1 nudges + task reminders + morning briefing.
  * Auth: `Authorization: Bearer ${CRON_SECRET}`.
  */
 export async function GET(request: Request): Promise<Response> {
@@ -28,11 +29,12 @@ export async function GET(request: Request): Promise<Response> {
   }
 
   try {
-    const [nudges, briefing] = await Promise.all([
+    const [nudges, taskReminders, briefing] = await Promise.all([
       runAdvanceNudges(),
+      runTaskReminders(),
       runDailyBriefings({ slot: 'morning' }),
     ]);
-    return NextResponse.json({ ok: true, nudges, briefing });
+    return NextResponse.json({ ok: true, nudges, taskReminders, briefing });
   } catch (error) {
     console.error('[cron/advance-nudges]', error);
     return NextResponse.json({ error: 'morning_jobs_failed' }, { status: 500 });

@@ -58,19 +58,36 @@ async function notifyFamilyExceptCreator(input: {
   });
 }
 
-/** New one-time calendar event — notify other family members. */
+/** New one-time calendar event — notify addressed participants, or whole family if none. */
 export async function notifyEventCreated(input: {
   familyId: number;
   createdBy: number;
   eventId: number;
   eventTitle: string;
+  participantUserIds?: number[];
   localePath?: string;
 }): Promise<void> {
+  const rawParticipants = input.participantUserIds;
+  // Non-empty list = targeted event (even if only the creator remains after filter).
+  if (rawParticipants != null && rawParticipants.length > 0) {
+    const recipients = rawParticipants.filter((id) => id !== input.createdBy);
+    if (recipients.length === 0) {
+      return;
+    }
+    await sendPushToUsers(recipients, {
+      title: 'Okhana · Calendar',
+      body: `📅 You’re included: «${input.eventTitle}»`,
+      url: dashboardNotificationUrl(input.localePath),
+      tag: `event-${input.eventId}`,
+    });
+    return;
+  }
+
   await notifyFamilyExceptCreator({
     familyId: input.familyId,
     createdBy: input.createdBy,
-    title: 'Okhana',
-    body: `📅 ${input.eventTitle}`,
+    title: 'Okhana · Calendar',
+    body: `📅 New event: «${input.eventTitle}»`,
     tag: `event-${input.eventId}`,
     localePath: input.localePath,
   });

@@ -22,6 +22,8 @@ export type PlannedAdvanceNudge = {
   body: string;
   leadDays: AdvanceNudgeLeadDays;
   occurrenceIso: string;
+  /** null = whole family; otherwise only these user ids. */
+  recipientUserIds: number[] | null;
 };
 
 function isLeadDay(days: number): days is AdvanceNudgeLeadDays {
@@ -94,6 +96,7 @@ export function planMemberBirthdayNudges(input: {
       dedupeKey: `member_birthday:${input.userId}:${occurrenceIso}:${days}`,
       tag: `nudge-bday-${input.userId}-${occurrenceIso}-${days}`,
       body: `🎂 День рождения: ${input.displayName} — ${leadPhraseRu(days)}`,
+      recipientUserIds: null,
     },
   ];
 }
@@ -120,6 +123,7 @@ export function planMemorableDateNudges(input: {
       dedupeKey: `memorable_date:${input.dateId}:${occurrenceIso}:${days}`,
       tag: `nudge-date-${input.dateId}-${occurrenceIso}-${days}`,
       body: `💝 ${input.title} — ${leadPhraseRu(days)}`,
+      recipientUserIds: null,
     },
   ];
 }
@@ -131,6 +135,8 @@ export function planEventNudges(input: {
   startTime: Date;
   today: CalendarYmd;
   offsetMinutes?: number;
+  /** When set (non-empty), only these members get the advance nudge. */
+  participantUserIds?: number[] | null;
 }): PlannedAdvanceNudge[] {
   const eventDay = calendarYmdInOffset(
     input.startTime,
@@ -141,6 +147,7 @@ export function planEventNudges(input: {
     return [];
   }
   const occurrenceIso = `${eventDay.year}-${String(eventDay.month).padStart(2, '0')}-${String(eventDay.day).padStart(2, '0')}`;
+  const participants = (input.participantUserIds ?? []).filter((id) => id > 0);
   return [
     {
       kind: 'event',
@@ -150,6 +157,7 @@ export function planEventNudges(input: {
       dedupeKey: `event:${input.eventId}:${occurrenceIso}:${days}`,
       tag: `nudge-event-${input.eventId}-${occurrenceIso}-${days}`,
       body: `📅 ${input.title} — ${leadPhraseRu(days)}`,
+      recipientUserIds: participants.length > 0 ? participants : null,
     },
   ];
 }

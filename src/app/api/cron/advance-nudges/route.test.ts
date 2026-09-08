@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockRunAdvanceNudges = vi.hoisted(() => vi.fn());
 const mockRunDailyBriefings = vi.hoisted(() => vi.fn());
+const mockRunTaskReminders = vi.hoisted(() => vi.fn());
 
 vi.mock('@/features/notifications/run-advance-nudges', () => ({
   runAdvanceNudges: (...args: unknown[]) => mockRunAdvanceNudges(...args),
@@ -11,10 +12,15 @@ vi.mock('@/features/notifications/run-daily-briefings', () => ({
   runDailyBriefings: (...args: unknown[]) => mockRunDailyBriefings(...args),
 }));
 
+vi.mock('@/features/notifications/run-task-reminders', () => ({
+  runTaskReminders: (...args: unknown[]) => mockRunTaskReminders(...args),
+}));
+
 describe('GET /api/cron/advance-nudges', () => {
   beforeEach(() => {
     mockRunAdvanceNudges.mockReset();
     mockRunDailyBriefings.mockReset();
+    mockRunTaskReminders.mockReset();
     delete process.env.CRON_SECRET;
     vi.resetModules();
   });
@@ -50,6 +56,11 @@ describe('GET /api/cron/advance-nudges', () => {
       skippedEmpty: 1,
       membersScanned: 5,
     });
+    mockRunTaskReminders.mockResolvedValue({
+      pendingSeenSent: 1,
+      dueSent: 2,
+      skippedDuplicate: 0,
+    });
     const { GET } = await import('@/app/api/cron/advance-nudges/route');
     const response = await GET(
       new Request('http://localhost/api/cron/advance-nudges', {
@@ -65,6 +76,11 @@ describe('GET /api/cron/advance-nudges', () => {
         skippedDuplicate: 1,
         familiesScanned: 3,
       },
+      taskReminders: {
+        pendingSeenSent: 1,
+        dueSent: 2,
+        skippedDuplicate: 0,
+      },
       briefing: {
         slot: 'morning',
         planned: 4,
@@ -75,6 +91,7 @@ describe('GET /api/cron/advance-nudges', () => {
       },
     });
     expect(mockRunAdvanceNudges).toHaveBeenCalledOnce();
+    expect(mockRunTaskReminders).toHaveBeenCalledOnce();
     expect(mockRunDailyBriefings).toHaveBeenCalledWith({ slot: 'morning' });
   });
 });

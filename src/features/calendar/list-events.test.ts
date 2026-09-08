@@ -78,7 +78,7 @@ describe('calendar list-events helpers', () => {
         title: 'Dentist',
         startTime: new Date('2026-09-10T10:00:00Z'),
       }),
-    ).resolves.toEqual({ id: 77 });
+    ).resolves.toEqual({ id: 77, participantUserIds: [] });
   });
 
   it('deleteFamilyEvent forbids children deleting others events', async () => {

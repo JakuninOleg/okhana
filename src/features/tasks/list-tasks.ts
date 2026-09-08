@@ -1,10 +1,12 @@
 import { and, desc, eq, inArray, or } from 'drizzle-orm';
+import { memberDisplayLabel } from '@/features/family/family-member-types';
 import { db } from '@/lib/server/db';
 import { withDbRetry } from '@/lib/server/db/client';
-import { familyTaskAssignees, familyTasks } from '@/lib/server/db/schema';
+import { familyTaskAssignees, familyTasks, users } from '@/lib/server/db/schema';
 
 export type TaskAssigneeView = {
   userId: number;
+  label: string;
   status: 'pending' | 'seen' | 'done' | 'cancelled';
   seenAt: string | null;
   doneAt: string | null;
@@ -16,6 +18,7 @@ export type VisibleTask = {
   description: string | null;
   dueAt: string | null;
   createdBy: number | null;
+  creatorLabel: string | null;
   createdAt: string;
   cancelledAt: string | null;
   /** True when the viewer created this task. */
@@ -71,6 +74,7 @@ export function filterTasksByScope(
 
 export function mapTaskRowsToVisible(input: {
   userId: number;
+  labelsByUserId: Map<number, string>;
   taskRows: Array<{
     id: number;
     title: string;
@@ -88,11 +92,15 @@ export function mapTaskRowsToVisible(input: {
     doneAt: Date | null;
   }>;
 }): VisibleTask[] {
+  const labelFor = (userId: number): string =>
+    input.labelsByUserId.get(userId) ?? `User ${userId}`;
+
   const byTask = new Map<number, TaskAssigneeView[]>();
   for (const row of input.assignees) {
     const list = byTask.get(row.taskId) ?? [];
     list.push({
       userId: row.userId,
+      label: labelFor(row.userId),
       status: row.status,
       seenAt: row.seenAt?.toISOString() ?? null,
       doneAt: row.doneAt?.toISOString() ?? null,
@@ -109,6 +117,7 @@ export function mapTaskRowsToVisible(input: {
       description: row.description,
       dueAt: row.dueAt?.toISOString() ?? null,
       createdBy: row.createdBy,
+      creatorLabel: row.createdBy != null ? labelFor(row.createdBy) : null,
       createdAt: row.createdAt.toISOString(),
       cancelledAt: row.cancelledAt?.toISOString() ?? null,
       isCreator: row.createdBy === input.userId,
@@ -156,20 +165,36 @@ export async function listVisibleTasks(input: ListVisibleTasksInput): Promise<Vi
       return [];
     }
 
-    const assignees = await db
-      .select({
-        taskId: familyTaskAssignees.taskId,
-        userId: familyTaskAssignees.userId,
-        status: familyTaskAssignees.status,
-        seenAt: familyTaskAssignees.seenAt,
-        doneAt: familyTaskAssignees.doneAt,
-      })
-      .from(familyTaskAssignees)
-      .where(inArray(familyTaskAssignees.taskId, taskRows.map((row) => row.id)));
+    const [assignees, members] = await Promise.all([
+      db
+        .select({
+          taskId: familyTaskAssignees.taskId,
+          userId: familyTaskAssignees.userId,
+          status: familyTaskAssignees.status,
+          seenAt: familyTaskAssignees.seenAt,
+          doneAt: familyTaskAssignees.doneAt,
+        })
+        .from(familyTaskAssignees)
+        .where(inArray(familyTaskAssignees.taskId, taskRows.map((row) => row.id))),
+      db
+        .select({
+          id: users.id,
+          email: users.email,
+          name: users.name,
+          displayName: users.displayName,
+        })
+        .from(users)
+        .where(eq(users.familyId, input.familyId)),
+    ]);
+
+    const labelsByUserId = new Map(
+      members.map((member) => [member.id, memberDisplayLabel(member)] as const),
+    );
 
     return filterTasksByScope(
       mapTaskRowsToVisible({
         userId: input.userId,
+        labelsByUserId,
         taskRows,
         assignees,
       }),

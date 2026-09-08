@@ -1,5 +1,5 @@
 import { auth } from '@clerk/nextjs/server';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, isNull } from 'drizzle-orm';
 import { getDailyChatQuotaSnapshot } from '@/lib/server/ai-usage-quota';
 import { db } from '@/lib/server/db';
 import { withDbRetry } from '@/lib/server/db/client';
@@ -14,6 +14,7 @@ export type ChatHistoryMessage = {
   role: 'user' | 'assistant' | 'system';
   content: string;
   createdAt: string;
+  updatedAt?: string | null;
 };
 
 export async function GET(): Promise<Response> {
@@ -57,9 +58,13 @@ export async function GET(): Promise<Response> {
           role: aiChatMessages.role,
           content: aiChatMessages.content,
           createdAt: aiChatMessages.createdAt,
+          updatedAt: aiChatMessages.updatedAt,
         })
         .from(aiChatMessages)
-        .where(eq(aiChatMessages.conversationId, conversation.id))
+        .where(and(
+          eq(aiChatMessages.conversationId, conversation.id),
+          isNull(aiChatMessages.deletedAt),
+        ))
         .orderBy(desc(aiChatMessages.createdAt), desc(aiChatMessages.id))
         .limit(CHAT_HISTORY_LIMIT);
 
@@ -68,6 +73,7 @@ export async function GET(): Promise<Response> {
         role: message.role,
         content: message.content,
         createdAt: message.createdAt.toISOString(),
+        updatedAt: message.updatedAt?.toISOString() ?? null,
       }));
 
       return Response.json({
