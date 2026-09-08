@@ -97,6 +97,23 @@ describe('advance-nudge-plan', () => {
       leadDays: 3,
       occurrenceIso: '2026-09-10',
       body: '📅 Врач — через 3 дня',
+      recipientUserIds: null,
+    });
+  });
+
+  it('plans targeted event nudges for participants only', () => {
+    const start = new Date('2026-09-10T07:00:00.000Z');
+    const planned = planEventNudges({
+      familyId: 3,
+      eventId: 12,
+      title: 'Board games',
+      startTime: start,
+      today,
+      offsetMinutes: 180,
+      participantUserIds: [2, 5],
+    });
+    expect(planned[0]).toMatchObject({
+      recipientUserIds: [2, 5],
     });
   });
 

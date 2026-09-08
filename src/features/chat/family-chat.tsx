@@ -388,6 +388,16 @@ export function FamilyChat(): React.JSX.Element {
       if (nextQuota) {
         setQuota(nextQuota);
       }
+      const persistedUserMessageId = response.headers.get('X-Okhana-User-Message-Id');
+      if (persistedUserMessageId && /^\d+$/.test(persistedUserMessageId)) {
+        updateFamilyChatMessages((current) =>
+          current.map((message) =>
+            message.id === userMessage.id
+              ? { ...message, id: persistedUserMessageId }
+              : message,
+          ),
+        );
+      }
       if (!response.body) {
         throw new Error(t('streamUnavailable'));
       }
@@ -580,11 +590,22 @@ export function FamilyChat(): React.JSX.Element {
               messages.map((message) => (
                 <ChatMessage
                   key={message.id}
+                  id={message.id}
                   role={message.role}
                   content={message.content}
                   isStreaming={status === 'streaming'}
                   assistantName={t('assistantName')}
                   thinkingLabel={t('thinking')}
+                  onContentChange={(id, content) => {
+                    updateFamilyChatMessages((current) =>
+                      current.map((row) => (row.id === id ? { ...row, content } : row)),
+                    );
+                  }}
+                  onDelete={(id) => {
+                    updateFamilyChatMessages((current) =>
+                      current.filter((row) => row.id !== id),
+                    );
+                  }}
                 />
               ))
             )}

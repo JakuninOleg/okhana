@@ -80,6 +80,7 @@ const createEventArgsSchema = z.object({
   startTime: z.string().min(1),
   endTime: z.string().min(1).optional(),
   allDay: z.boolean().optional(),
+  participantUserIds: z.array(z.number().int().positive()).optional(),
 });
 
 const listEventsArgsSchema = z.object({
@@ -243,6 +244,12 @@ export function getAiToolDefinitions(): GoAiToolDefinition[] {
             },
             endTime: { type: 'string' },
             allDay: { type: 'boolean', default: false },
+            participantUserIds: {
+              type: 'array',
+              items: { type: 'integer' },
+              description:
+                'Family member user ids this event is addressed to (they get the push). Omit to notify the whole family.',
+            },
           },
           required: ['title', 'startTime'],
           additionalProperties: false,
@@ -499,14 +506,20 @@ export async function executeAiTool(
       startTime,
       endTime,
       allDay: parsed.data.allDay ?? false,
+      participantUserIds: parsed.data.participantUserIds,
     }).then((created) => {
       void notifyEventCreated({
         familyId: input.familyId,
         createdBy: input.userId,
         eventId: created.id,
         eventTitle: parsed.data.title,
+        participantUserIds: created.participantUserIds,
       });
-      return created;
+      return {
+        id: created.id,
+        title: parsed.data.title,
+        participantUserIds: created.participantUserIds,
+      };
     });
   }
 

@@ -134,6 +134,7 @@ const createSchema = z.object({
   startTime: z.string().trim().min(1),
   endTime: z.string().trim().optional().or(z.literal('')),
   allDay: z.boolean().optional(),
+  participantUserIds: z.array(z.coerce.number().int().positive()).optional(),
 });
 
 function parseClientDate(value: string): Date | null {
@@ -180,6 +181,7 @@ export async function createCalendarEventAction(
       startTime,
       endTime,
       allDay: parsed.data.allDay ?? false,
+      participantUserIds: parsed.data.participantUserIds,
     });
 
     void notifyEventCreated({
@@ -187,6 +189,7 @@ export async function createCalendarEventAction(
       createdBy: actor.userId,
       eventId: created.id,
       eventTitle: parsed.data.title,
+      participantUserIds: created.participantUserIds,
     });
 
     revalidatePath('/[locale]/dashboard', 'page');

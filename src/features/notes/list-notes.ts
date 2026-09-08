@@ -169,3 +169,66 @@ export async function updateVisibleNotePrivacy(
     return { ok: true };
   });
 }
+
+export type UpdateNoteContentInput = {
+  familyId: number;
+  userId: number;
+  familyRole: FamilyRole;
+  noteId: number;
+  title: string;
+  content: string;
+};
+
+/**
+ * Author may edit title/content of their own note.
+ * Owners/adults may edit any visible note (same gate as delete).
+ */
+export async function updateVisibleNoteContent(
+  input: UpdateNoteContentInput,
+): Promise<{ ok: true } | { ok: false; error: 'not_found' | 'forbidden' | 'invalid_input' }> {
+  const title = input.title.trim();
+  const content = input.content.trim();
+  if (!title || !content) {
+    return { ok: false, error: 'invalid_input' };
+  }
+  if (title.length > 255 || content.length > 8000) {
+    return { ok: false, error: 'invalid_input' };
+  }
+
+  return withDbRetry(async () => {
+    const [row] = await db
+      .select({
+        id: notes.id,
+        createdBy: notes.createdBy,
+      })
+      .from(notes)
+      .where(
+        and(
+          eq(notes.id, input.noteId),
+          eq(notes.familyId, input.familyId),
+          ...noteVisibilityConditions({
+            userId: input.userId,
+            familyRole: input.familyRole,
+          }),
+        ),
+      )
+      .limit(1);
+
+    if (!row) {
+      return { ok: false, error: 'not_found' };
+    }
+
+    const isOwnerOrAdult = input.familyRole === 'owner' || input.familyRole === 'adult';
+    const isAuthor = row.createdBy === input.userId;
+    if (!isAuthor && !isOwnerOrAdult) {
+      return { ok: false, error: 'forbidden' };
+    }
+
+    await db
+      .update(notes)
+      .set({ title, content })
+      .where(and(eq(notes.id, input.noteId), eq(notes.familyId, input.familyId)));
+
+    return { ok: true };
+  });
+}

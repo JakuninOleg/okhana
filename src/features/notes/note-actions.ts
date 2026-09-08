@@ -3,7 +3,7 @@
 import { auth } from '@clerk/nextjs/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
-import { updateVisibleNotePrivacy, deleteVisibleNote, listVisibleNotes, type VisibleNote } from '@/features/notes/list-notes';
+import { updateVisibleNotePrivacy, updateVisibleNoteContent, deleteVisibleNote, listVisibleNotes, type VisibleNote } from '@/features/notes/list-notes';
 import { ensureDbUser } from '@/lib/server/users/ensure-db-user';
 import { db } from '@/lib/server/db';
 import { withDbRetry } from '@/lib/server/db/client';
@@ -159,6 +159,51 @@ export async function updateNotePrivacyAction(
       noteId: parsed.data.noteId,
       privacyLevel: parsed.data.privacyLevel,
       hiddenFrom: parsed.data.hiddenFrom,
+    });
+
+    if (!result.ok) {
+      return { ok: false, error: result.error };
+    }
+
+    revalidatePath('/[locale]/dashboard', 'page');
+    return { ok: true };
+  } catch {
+    return { ok: false, error: 'db_unavailable' };
+  }
+}
+
+const contentSchema = z.object({
+  noteId: z.coerce.number().int().positive(),
+  title: z.string().trim().min(1).max(255),
+  content: z.string().trim().min(1).max(8000),
+});
+
+export async function updateNoteContentAction(
+  input: z.infer<typeof contentSchema>,
+): Promise<{ ok: true } | { ok: false; error: NoteActionError }> {
+  const { userId: clerkUserId } = await auth();
+  if (!clerkUserId) {
+    return { ok: false, error: 'unauthorized' };
+  }
+
+  const parsed = contentSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: 'invalid_input' };
+  }
+
+  try {
+    const actor = await loadActor(clerkUserId);
+    if (!actor) {
+      return { ok: false, error: 'forbidden' };
+    }
+
+    const result = await updateVisibleNoteContent({
+      familyId: actor.familyId,
+      userId: actor.userId,
+      familyRole: actor.familyRole,
+      noteId: parsed.data.noteId,
+      title: parsed.data.title,
+      content: parsed.data.content,
     });
 
     if (!result.ok) {

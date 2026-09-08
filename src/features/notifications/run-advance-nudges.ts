@@ -63,12 +63,18 @@ export async function runAdvanceNudges(input?: {
         .from(users)
         .where(eq(users.familyId, family.id)),
     );
-    const recipientIds = memberIds.map((row) => row.id);
-    if (recipientIds.length === 0) {
+    const familyRecipientIds = memberIds.map((row) => row.id);
+    if (familyRecipientIds.length === 0) {
       continue;
     }
 
     for (const nudge of nudges) {
+      const recipientIds = nudge.recipientUserIds?.length
+        ? nudge.recipientUserIds
+        : familyRecipientIds;
+      if (recipientIds.length === 0) {
+        continue;
+      }
       const inserted = await tryRecordDelivery(nudge);
       if (!inserted) {
         skippedDuplicate += 1;
@@ -174,6 +180,7 @@ async function collectFamilyNudges(
         id: events.id,
         title: events.title,
         startTime: events.startTime,
+        participantUserIds: events.participantUserIds,
       })
       .from(events)
       .where(
@@ -194,6 +201,7 @@ async function collectFamilyNudges(
         startTime: event.startTime,
         today,
         offsetMinutes,
+        participantUserIds: event.participantUserIds,
       }),
     );
   }

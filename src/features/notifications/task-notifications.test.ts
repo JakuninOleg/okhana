@@ -36,7 +36,7 @@ vi.mock('@/lib/server/db', () => ({
 
 vi.mock('@/lib/server/db/schema', () => ({
   familyTasks: { id: 'id', familyId: 'family_id', title: 'title', createdBy: 'created_by' },
-  users: { id: 'id', displayName: 'display_name', email: 'email' },
+  users: { id: 'id', displayName: 'display_name', name: 'name', email: 'email' },
 }));
 
 vi.mock('drizzle-orm', () => ({
@@ -51,6 +51,9 @@ describe('task notifications', () => {
   });
 
   it('notifyTaskAssigned pushes only to assignees other than the creator', async () => {
+    selectQueue.reset([
+      [{ displayName: 'Oleg', name: null, email: 'oleg@example.com' }],
+    ]);
     const { notifyTaskAssigned } = await import('./task-notifications');
 
     await notifyTaskAssigned({
@@ -63,8 +66,8 @@ describe('task notifications', () => {
     expect(mockSendPushToUsers).toHaveBeenCalledWith(
       [2, 3],
       expect.objectContaining({
-        title: 'Okhana',
-        body: 'Buy milk',
+        title: 'Okhana · New task',
+        body: 'Oleg assigned you: «Buy milk». Mark it seen when you notice it.',
         url: '/ru/dashboard',
         tag: expect.stringContaining('task-assigned'),
       }),
@@ -97,7 +100,7 @@ describe('task notifications', () => {
     expect(mockSendPushToUsers).toHaveBeenCalledWith(
       [1],
       expect.objectContaining({
-        body: '✓ Buy milk',
+        body: 'Family completed the task: «Buy milk»',
         url: '/ru/dashboard',
         tag: 'task-done-55',
       }),
@@ -133,7 +136,7 @@ describe('task notifications', () => {
     expect(mockSendPushToUsers).toHaveBeenCalledWith(
       [1],
       expect.objectContaining({
-        body: 'Masha · Buy milk',
+        body: 'Masha saw the task: «Buy milk»',
         url: '/ru/dashboard',
         tag: 'task-ack-55-2',
       }),

@@ -105,6 +105,8 @@ export const events = pgTable('events', {
   endTime: timestamp('end_time', { withTimezone: true }),
   allDay: boolean('all_day').default(false).notNull(),
   createdBy: integer('created_by').references(() => users.id, { onDelete: 'set null' }),
+  /** Family members this event is addressed to (targeted push). Empty/null = whole-family notify. */
+  participantUserIds: integer('participant_user_ids').array(),
   tags: varchar('tags', { length: 50 }).array(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [
@@ -217,6 +219,9 @@ export const aiChatMessages = pgTable('ai_chat_messages', {
   content: text('content').notNull(),
   metadata: jsonb('metadata'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }),
+  /** Soft-delete — hidden from history/UI but keeps conversation integrity. */
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
 }, (table) => [
   index('messages_conversation_idx').on(table.conversationId, table.createdAt),
 ]);

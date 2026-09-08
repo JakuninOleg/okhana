@@ -56,8 +56,38 @@ describe('family activity notifications', () => {
     });
     expect(mockSendPushToUsers).toHaveBeenCalledWith(
       [2, 3],
-      expect.objectContaining({ body: '📅 Dentist', tag: 'event-44' }),
+      expect.objectContaining({ body: '📅 New event: «Dentist»', tag: 'event-44' }),
     );
+  });
+
+  it('notifyEventCreated targets participants when provided', async () => {
+    const { notifyEventCreated } = await import('./family-activity-notifications');
+    await notifyEventCreated({
+      familyId: 9,
+      createdBy: 1,
+      eventId: 45,
+      eventTitle: 'Board games',
+      participantUserIds: [2, 1],
+    });
+    expect(mockSendPushToUsers).toHaveBeenCalledWith(
+      [2],
+      expect.objectContaining({
+        body: '📅 You’re included: «Board games»',
+        tag: 'event-45',
+      }),
+    );
+  });
+
+  it('notifyEventCreated no-ops when only the creator is a participant', async () => {
+    const { notifyEventCreated } = await import('./family-activity-notifications');
+    await notifyEventCreated({
+      familyId: 9,
+      createdBy: 1,
+      eventId: 46,
+      eventTitle: 'Solo reminder',
+      participantUserIds: [1],
+    });
+    expect(mockSendPushToUsers).not.toHaveBeenCalled();
   });
 
   it('notifyMemorableDateCreated pushes other family members', async () => {
