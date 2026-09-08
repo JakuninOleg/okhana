@@ -7,12 +7,18 @@ import { listFamilyDates } from '@/features/family/list-family-dates';
 import { listMemberBirthdays } from '@/features/family/list-member-birthdays';
 import { saveNote } from '@/features/notes/save-note';
 import { searchNotes } from '@/features/notes/search-notes';
+import {
+  deleteVisibleNote,
+  updateVisibleNoteContent,
+  updateVisibleNotePrivacy,
+} from '@/features/notes/list-notes';
 import { createFamilyTask } from '@/features/tasks/create-task';
 import { listVisibleTasks } from '@/features/tasks/list-tasks';
 import {
   acknowledgeTaskAssignment,
   completeTaskAssignment,
 } from '@/features/tasks/update-assignment';
+import { cancelFamilyTask, updateFamilyTask } from '@/features/tasks/manage-task';
 import {
   notifyTaskAcknowledged,
   notifyTaskAssigned,
@@ -52,6 +58,22 @@ const searchNotesArgsSchema = z.object({
   limit: z.number().int().min(1).max(10).default(5),
 });
 
+const updateNoteArgsSchema = z.object({
+  noteId: z.number().int().positive(),
+  title: z.string().min(1).max(255),
+  content: z.string().min(1).max(8000),
+});
+
+const noteIdArgsSchema = z.object({
+  noteId: z.number().int().positive(),
+});
+
+const updateNotePrivacyArgsSchema = z.object({
+  noteId: z.number().int().positive(),
+  privacyLevel: z.enum(['public', 'adults_only', 'personal']),
+  hiddenFrom: z.array(z.number().int().positive()).optional(),
+});
+
 const createTaskArgsSchema = z.object({
   title: z.string().min(1).max(255),
   description: z.string().max(2000).optional(),
@@ -72,6 +94,19 @@ const listTasksArgsSchema = z.object({
 
 const taskIdArgsSchema = z.object({
   taskId: z.number().int().positive(),
+});
+
+const updateTaskArgsSchema = z.object({
+  taskId: z.number().int().positive(),
+  title: z.string().min(1).max(255).optional(),
+  description: z.string().max(2000).optional().nullable(),
+  dueAt: z
+    .string()
+    .optional()
+    .nullable()
+    .refine((value) => value == null || !Number.isNaN(Date.parse(value)), {
+      message: 'Invalid dueAt datetime',
+    }),
 });
 
 const createEventArgsSchema = z.object({
@@ -135,7 +170,7 @@ export function getAiToolDefinitions(): GoAiToolDefinition[] {
       function: {
         name: 'search_notes',
         description:
-          'Search family NOTES (заметки / facts). Not for tasks or memorable dates. Results are already filtered by user permissions.',
+          'Search family NOTES (заметки / facts). Returns note ids for update_note / delete_note / update_note_privacy. Not for tasks or memorable dates. Results are already filtered by user permissions.',
         parameters: {
           type: 'object',
           properties: {
@@ -143,6 +178,64 @@ export function getAiToolDefinitions(): GoAiToolDefinition[] {
             limit: { type: 'integer', minimum: 1, maximum: 10, default: 5 },
           },
           required: ['query'],
+          additionalProperties: false,
+        },
+      },
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'update_note',
+        description:
+          'Update title/content of an existing note the user can manage. Call search_notes first to get noteId. Author or owner/adult only.',
+        parameters: {
+          type: 'object',
+          properties: {
+            noteId: { type: 'integer', minimum: 1 },
+            title: { type: 'string', minLength: 1, maxLength: 255 },
+            content: { type: 'string', minLength: 1, maxLength: 8000 },
+          },
+          required: ['noteId', 'title', 'content'],
+          additionalProperties: false,
+        },
+      },
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'update_note_privacy',
+        description:
+          'Change privacyLevel and optional hiddenFrom for a note. Author or owner/adult. Use after search_notes.',
+        parameters: {
+          type: 'object',
+          properties: {
+            noteId: { type: 'integer', minimum: 1 },
+            privacyLevel: {
+              type: 'string',
+              enum: ['public', 'adults_only', 'personal'],
+            },
+            hiddenFrom: {
+              type: 'array',
+              items: { type: 'integer', minimum: 1 },
+            },
+          },
+          required: ['noteId', 'privacyLevel'],
+          additionalProperties: false,
+        },
+      },
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'delete_note',
+        description:
+          'Delete a note the user can manage (author or owner/adult). Call search_notes first for noteId. Confirm destructive intent when ambiguous.',
+        parameters: {
+          type: 'object',
+          properties: {
+            noteId: { type: 'integer', minimum: 1 },
+          },
+          required: ['noteId'],
           additionalProperties: false,
         },
       },
@@ -182,7 +275,7 @@ export function getAiToolDefinitions(): GoAiToolDefinition[] {
       function: {
         name: 'list_tasks',
         description:
-          'List family TASKS / ПОРУЧЕНИЯ visible to the current user (as creator and/or assignee). Not notes or memorable dates.',
+          'List family TASKS / ПОРУЧЕНИЯ visible to the current user (as creator and/or assignee). Use before update_task / cancel_task / acknowledge_task / complete_task to get taskId. Not notes or memorable dates.',
         parameters: {
           type: 'object',
           properties: {
@@ -192,6 +285,44 @@ export function getAiToolDefinitions(): GoAiToolDefinition[] {
               default: 'active',
             },
           },
+          additionalProperties: false,
+        },
+      },
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'update_task',
+        description:
+          'Edit an existing task title, description, and/or dueAt. Creator or owner/adult. Call list_tasks first for taskId. Pass only fields that should change.',
+        parameters: {
+          type: 'object',
+          properties: {
+            taskId: { type: 'integer', minimum: 1 },
+            title: { type: 'string', minLength: 1, maxLength: 255 },
+            description: { type: 'string', maxLength: 2000 },
+            dueAt: {
+              type: 'string',
+              description: 'ISO-8601 datetime with offset, or omit/null to clear.',
+            },
+          },
+          required: ['taskId'],
+          additionalProperties: false,
+        },
+      },
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'cancel_task',
+        description:
+          'Cancel (soft-delete) a task. Creator or owner/adult. Call list_tasks first. Prefer cancel over inventing a new conflicting task.',
+        parameters: {
+          type: 'object',
+          properties: {
+            taskId: { type: 'integer', minimum: 1 },
+          },
+          required: ['taskId'],
           additionalProperties: false,
         },
       },
@@ -348,7 +479,7 @@ export async function executeAiTool(
       return { error: 'Invalid remember_note arguments' };
     }
 
-    await saveNote({
+    const saved = await saveNote({
       familyId: input.familyId,
       createdBy: input.userId,
       title: parsed.data.title,
@@ -366,7 +497,7 @@ export async function executeAiTool(
       hiddenFrom: parsed.data.hiddenFrom ?? null,
     });
 
-    return { saved: true, title: parsed.data.title };
+    return { saved: true, noteId: saved.id, title: parsed.data.title };
   }
 
   if (name === 'search_notes') {
@@ -384,6 +515,65 @@ export async function executeAiTool(
         limit: parsed.data.limit,
       }),
     };
+  }
+
+  if (name === 'update_note') {
+    const parsed = updateNoteArgsSchema.safeParse(args);
+    if (!parsed.success) {
+      return { error: 'Invalid update_note arguments' };
+    }
+    const result = await updateVisibleNoteContent({
+      familyId: input.familyId,
+      userId: input.userId,
+      familyRole: input.familyRole,
+      noteId: parsed.data.noteId,
+      title: parsed.data.title,
+      content: parsed.data.content,
+    });
+    if (!result.ok) {
+      return { error: result.error };
+    }
+    return { updated: true, noteId: parsed.data.noteId, title: parsed.data.title };
+  }
+
+  if (name === 'update_note_privacy') {
+    const parsed = updateNotePrivacyArgsSchema.safeParse(args);
+    if (!parsed.success) {
+      return { error: 'Invalid update_note_privacy arguments' };
+    }
+    const result = await updateVisibleNotePrivacy({
+      familyId: input.familyId,
+      userId: input.userId,
+      familyRole: input.familyRole,
+      noteId: parsed.data.noteId,
+      privacyLevel: parsed.data.privacyLevel,
+      hiddenFrom: parsed.data.hiddenFrom ?? [],
+    });
+    if (!result.ok) {
+      return { error: result.error };
+    }
+    return {
+      updated: true,
+      noteId: parsed.data.noteId,
+      privacyLevel: parsed.data.privacyLevel,
+    };
+  }
+
+  if (name === 'delete_note') {
+    const parsed = noteIdArgsSchema.safeParse(args);
+    if (!parsed.success) {
+      return { error: 'Invalid delete_note arguments' };
+    }
+    const result = await deleteVisibleNote({
+      familyId: input.familyId,
+      userId: input.userId,
+      familyRole: input.familyRole,
+      noteId: parsed.data.noteId,
+    });
+    if (!result.ok) {
+      return { error: result.error };
+    }
+    return { deleted: true, noteId: parsed.data.noteId };
   }
 
   if (name === 'create_task') {
@@ -434,6 +624,59 @@ export async function executeAiTool(
         scope: parsed.data.scope,
       }),
     };
+  }
+
+  if (name === 'update_task') {
+    const parsed = updateTaskArgsSchema.safeParse(args);
+    if (!parsed.success) {
+      return { error: 'Invalid update_task arguments' };
+    }
+    const hasField =
+      parsed.data.title !== undefined
+      || parsed.data.description !== undefined
+      || parsed.data.dueAt !== undefined;
+    if (!hasField) {
+      return { error: 'Invalid update_task arguments' };
+    }
+    const result = await updateFamilyTask({
+      familyId: input.familyId,
+      userId: input.userId,
+      familyRole: input.familyRole,
+      taskId: parsed.data.taskId,
+      title: parsed.data.title,
+      description: parsed.data.description,
+      dueAt: parsed.data.dueAt === undefined
+        ? undefined
+        : parsed.data.dueAt === null
+          ? null
+          : new Date(parsed.data.dueAt),
+    });
+    if (!result.ok) {
+      return { error: result.error };
+    }
+    return {
+      updated: true,
+      taskId: result.taskId,
+      title: result.title,
+      dueAt: result.dueAt,
+    };
+  }
+
+  if (name === 'cancel_task') {
+    const parsed = taskIdArgsSchema.safeParse(args);
+    if (!parsed.success) {
+      return { error: 'Invalid cancel_task arguments' };
+    }
+    const result = await cancelFamilyTask({
+      familyId: input.familyId,
+      userId: input.userId,
+      familyRole: input.familyRole,
+      taskId: parsed.data.taskId,
+    });
+    if (!result.ok) {
+      return { error: result.error };
+    }
+    return { cancelled: true, taskId: result.taskId };
   }
 
   if (name === 'acknowledge_task') {

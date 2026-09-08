@@ -1,6 +1,6 @@
 'use client';
 
-import { Loader2, MessageSquarePlus, StickyNote, Trash2 } from 'lucide-react';
+import { Loader2, MessageSquarePlus, StickyNote } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useCallback, useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
@@ -15,7 +15,6 @@ import {
 import { requestFamilyChatSend } from '@/features/chat/family-chat-store';
 import { HubToolbarIcon, HubToolbarLabel, hubToolbarTriggerClassName } from '@/features/family/hub-toolbar';
 import {
-  deleteNoteAction,
   loadVisibleNotesAction,
   updateNoteContentAction,
   updateNotePrivacyAction,
@@ -37,7 +36,6 @@ function NoteRow({
   canManage,
   members,
   pending,
-  onDelete,
   onSavePrivacy,
   onSaveContent,
 }: {
@@ -45,7 +43,6 @@ function NoteRow({
   canManage: boolean;
   members: NoteMemberOption[];
   pending: boolean;
-  onDelete: (id: number) => void;
   onSavePrivacy: (input: {
     noteId: number;
     privacyLevel: PrivacyLevel;
@@ -169,18 +166,6 @@ function NoteRow({
               {editing ? t('privacyCancel') : t('privacyEdit')}
             </Button>
           ) : null}
-          {canManage ? (
-            <Button
-              type="button"
-              size="icon-sm"
-              variant="ghost"
-              disabled={pending}
-              aria-label={t('delete')}
-              onClick={() => onDelete(note.id)}
-            >
-              <Trash2 className="size-3.5" />
-            </Button>
-          ) : null}
         </div>
       </div>
 
@@ -274,18 +259,6 @@ export function FamilyNotesSheet(): React.JSX.Element {
     setCurrentUserId(result.currentUserId);
     setFamilyRole(result.familyRole);
   }, [t]);
-
-  function onDelete(noteId: number): void {
-    startTransition(async () => {
-      setError(null);
-      const result = await deleteNoteAction({ noteId });
-      if (!result.ok) {
-        setError(t(`errors.${result.error}`));
-        return;
-      }
-      await refresh();
-    });
-  }
 
   function onSavePrivacy(input: {
     noteId: number;
@@ -386,7 +359,6 @@ export function FamilyNotesSheet(): React.JSX.Element {
                     canManage={canManage}
                     members={members}
                     pending={pending}
-                    onDelete={onDelete}
                     onSavePrivacy={onSavePrivacy}
                     onSaveContent={onSaveContent}
                   />

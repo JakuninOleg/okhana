@@ -16,21 +16,25 @@ type SaveNoteInput = {
   hiddenFrom?: number[];
 };
 
-export async function saveNote(input: SaveNoteInput): Promise<void> {
+export async function saveNote(input: SaveNoteInput): Promise<{ id: number }> {
   const member = await loadActiveFamilyMember(input.createdBy, input.familyId);
   if (!member) {
     throw new Error('Creator is not in this family');
   }
 
-  await withDbRetry(async () => {
-    await db.insert(notes).values({
-      familyId: member.familyId,
-      createdBy: input.createdBy,
-      title: input.title,
-      content: input.content,
-      category: input.category ?? 'general',
-      privacyLevel: input.privacyLevel ?? 'public',
-      hiddenFrom: input.hiddenFrom && input.hiddenFrom.length > 0 ? input.hiddenFrom : null,
-    });
+  return withDbRetry(async () => {
+    const [row] = await db
+      .insert(notes)
+      .values({
+        familyId: member.familyId,
+        createdBy: input.createdBy,
+        title: input.title,
+        content: input.content,
+        category: input.category ?? 'general',
+        privacyLevel: input.privacyLevel ?? 'public',
+        hiddenFrom: input.hiddenFrom && input.hiddenFrom.length > 0 ? input.hiddenFrom : null,
+      })
+      .returning({ id: notes.id });
+    return { id: row.id };
   });
 }

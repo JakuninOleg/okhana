@@ -8,6 +8,10 @@ import { requestFamilyChatSend } from '@/features/chat/family-chat-store';
 import { enableWebPush } from '@/features/notifications/enable-web-push';
 import type { VisibleTask } from '@/features/tasks/list-tasks';
 import { FamilyTasksSheet } from '@/features/tasks/family-tasks-sheet';
+import {
+  isTaskDueTodayOrTomorrow,
+  selectPriorityTasks,
+} from '@/features/tasks/priority-tasks';
 import { formatDateTimeMedium } from '@/lib/format-date';
 import { cn } from '@/lib/utils';
 
@@ -31,6 +35,8 @@ export function FamilyTasksPriority({
   // Snapshot once — Date.now() during render trips react-hooks/purity.
   const [nowMs] = useState(() => Date.now());
   const knownIdsRef = useRef(new Set(initialTasks.map((task) => task.id)));
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [focusTaskId, setFocusTaskId] = useState<number | null>(null);
 
   useEffect(() => {
     // Quietly refresh an existing subscription; enable UI lives in family settings.
@@ -89,9 +95,14 @@ export function FamilyTasksPriority({
     };
   }, [t]);
 
-  const dueSoon = tasks
-    .filter((task) => task.dueAt)
-    .sort((a, b) => String(a.dueAt).localeCompare(String(b.dueAt)));
+  const now = new Date(nowMs);
+  const displayTasks = selectPriorityTasks(tasks, now, 5);
+  const dueSoon = displayTasks.find((task) => task.dueAt);
+
+  function openTaskDetail(taskId: number): void {
+    setFocusTaskId(taskId);
+    setSheetOpen(true);
+  }
 
   return (
     <section className="shrink-0 rounded-2xl border border-brand-peach/40 bg-brand-sun/30 p-3 shadow-sm sm:p-4 dark:border-brand-peach/50 dark:bg-brand-sun/15">
@@ -103,10 +114,19 @@ export function FamilyTasksPriority({
           </h2>
           <p className="text-sm text-muted-foreground">{t('prioritySubtitle')}</p>
         </div>
-        <FamilyTasksSheet />
+        <FamilyTasksSheet
+          open={sheetOpen}
+          onOpenChange={(next) => {
+            setSheetOpen(next);
+            if (!next) {
+              setFocusTaskId(null);
+            }
+          }}
+          focusTaskId={focusTaskId}
+        />
       </div>
 
-      {tasks.length === 0 ? (
+      {displayTasks.length === 0 ? (
         <div className="space-y-3">
           <p className="text-sm text-muted-foreground">{t('priorityEmpty')}</p>
           <Button
@@ -120,38 +140,41 @@ export function FamilyTasksPriority({
         </div>
       ) : (
         <ul className="space-y-2">
-          {tasks.slice(0, 5).map((task) => {
+          {displayTasks.map((task) => {
             const due = formatDue(task.dueAt, locale);
-            const isUrgent = Boolean(
-              task.dueAt && new Date(task.dueAt).getTime() - nowMs < 24 * 60 * 60 * 1000,
-            );
+            const isUrgent = isTaskDueTodayOrTomorrow(task.dueAt, now);
             return (
-              <li
-                key={task.id}
-                className={cn(
-                  'rounded-xl border border-border/50 bg-background/80 px-3 py-2.5',
-                  isUrgent && 'border-brand-peach/60',
-                )}
-              >
-                <p className="text-sm font-medium text-foreground">{task.title}</p>
-                <p className="text-xs text-muted-foreground">
-                  {[
-                    due ? t('dueLabel', { due }) : t('noDue'),
-                    task.isCreator ? t('youCreated') : null,
-                    task.myAssignment ? t(`status.${task.myAssignment.status}`) : null,
-                  ]
-                    .filter(Boolean)
-                    .join(' · ')}
-                </p>
+              <li key={task.id}>
+                <button
+                  type="button"
+                  className={cn(
+                    'w-full rounded-xl border border-border/50 bg-background/80 px-3 py-2.5 text-left transition-colors',
+                    'hover:border-brand-peach/50 hover:bg-background',
+                    isUrgent && 'border-brand-peach/60',
+                  )}
+                  onClick={() => openTaskDetail(task.id)}
+                >
+                  <p className="text-sm font-medium text-foreground">{task.title}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {[
+                      isUrgent ? t('priorityUrgent') : null,
+                      due ? t('dueLabel', { due }) : t('noDue'),
+                      task.isCreator ? t('youCreated') : null,
+                      task.myAssignment ? t(`status.${task.myAssignment.status}`) : null,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </p>
+                </button>
               </li>
             );
           })}
         </ul>
       )}
 
-      {dueSoon[0]?.dueAt ? (
+      {dueSoon?.dueAt ? (
         <p className="mt-3 text-xs text-muted-foreground">
-          {t('reminderHint', { title: dueSoon[0].title })}
+          {t('reminderHint', { title: dueSoon.title })}
         </p>
       ) : null}
     </section>

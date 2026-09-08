@@ -48,6 +48,9 @@ describe('buildSystemPrompt task vs fact routing', () => {
     expect(prompt).toContain('запомни купи молоко');
     expect(prompt).toContain('remember_note');
     expect(prompt).toContain('create_task');
+    expect(prompt).toContain('update_note');
+    expect(prompt).toContain('cancel_task');
+    expect(prompt).toContain('MANAGE EXISTING');
     expect(prompt).toContain('default to assigning the current user');
   });
 
