@@ -18,7 +18,7 @@ describe('daily-briefing-plan', () => {
         dateLines: ['через 3 дня: ДР Саша'],
       }),
     ).toEqual({
-      title: 'Okhana · утро',
+      title: 'Доброе утро',
       body: '2 поручения · завтра: Врач · через 3 дня: ДР Саша',
     });
   });

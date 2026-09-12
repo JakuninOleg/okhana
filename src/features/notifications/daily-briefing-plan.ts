@@ -52,7 +52,7 @@ export function buildBriefingPushContent(
 
   const body = parts.join(' · ');
   return {
-    title: input.slot === 'morning' ? 'Okhana · утро' : 'Okhana · вечер',
+    title: input.slot === 'morning' ? 'Доброе утро' : 'Добрый вечер',
     body: body.length <= MAX_PUSH_BODY ? body : `${body.slice(0, MAX_PUSH_BODY - 1)}…`,
   };
 }

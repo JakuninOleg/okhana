@@ -66,8 +66,8 @@ describe('task notifications', () => {
     expect(mockSendPushToUsers).toHaveBeenCalledWith(
       [2, 3],
       expect.objectContaining({
-        title: 'Okhana · New task',
-        body: 'Oleg assigned you: «Buy milk». Mark it seen when you notice it.',
+        title: 'Новое поручение',
+        body: 'Oleg поручил вам: «Buy milk». Отметьте «Видел», когда заметите.',
         url: '/ru/dashboard',
         tag: expect.stringContaining('task-assigned'),
       }),
@@ -100,7 +100,7 @@ describe('task notifications', () => {
     expect(mockSendPushToUsers).toHaveBeenCalledWith(
       [1],
       expect.objectContaining({
-        body: 'Family completed the task: «Buy milk»',
+        body: 'Кто-то из семьи выполнил(а): «Buy milk»',
         url: '/ru/dashboard',
         tag: 'task-done-55',
       }),
@@ -136,7 +136,7 @@ describe('task notifications', () => {
     expect(mockSendPushToUsers).toHaveBeenCalledWith(
       [1],
       expect.objectContaining({
-        body: 'Masha saw the task: «Buy milk»',
+        body: 'Masha увидел(а): «Buy milk»',
         url: '/ru/dashboard',
         tag: 'task-ack-55-2',
       }),

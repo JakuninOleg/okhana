@@ -27,10 +27,10 @@ export type TaskReminderRunResult = {
 const PENDING_SEEN_AFTER_MS = 2 * 60 * 60 * 1000; // 2 hours
 
 function leadPhrase(leadDays: AdvanceNudgeLeadDays | 0): string {
-  if (leadDays === 0) return 'Due today';
-  if (leadDays === 1) return 'Due tomorrow';
-  if (leadDays === 7) return 'Due in 7 days';
-  return `Due in ${leadDays} days`;
+  if (leadDays === 0) return 'Сегодня';
+  if (leadDays === 1) return 'Завтра';
+  if (leadDays === 7) return 'Через 7 дней';
+  return `Через ${leadDays} дня`;
 }
 
 async function tryClaim(dedupeKey: string, familyId: number): Promise<boolean> {

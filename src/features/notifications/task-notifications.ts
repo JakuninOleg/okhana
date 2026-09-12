@@ -24,8 +24,20 @@ async function loadUserLabel(userId: number): Promise<string> {
     .from(users)
     .where(eq(users.id, userId))
     .limit(1);
-  if (!actor) return 'Family';
+  if (!actor) return 'Кто-то из семьи';
   return memberDisplayLabel(actor);
+}
+
+function formatDueRu(dueAt: string): string {
+  const date = new Date(dueAt);
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${day}.${month} ${hours}:${minutes}`;
 }
 
 /**
@@ -45,13 +57,11 @@ export async function notifyTaskAssigned(input: {
   }
 
   const creatorLabel = await withDbRetry(() => loadUserLabel(input.createdBy));
-  const dueSuffix = input.dueAt
-    ? ` · due ${new Date(input.dueAt).toISOString().slice(0, 16).replace('T', ' ')}`
-    : '';
+  const dueSuffix = input.dueAt ? ` · срок ${formatDueRu(input.dueAt)}` : '';
 
   await sendPushToUsers(recipients, {
-    title: 'Okhana · New task',
-    body: `${creatorLabel} assigned you: «${input.title}»${dueSuffix}. Mark it seen when you notice it.`,
+    title: 'Новое поручение',
+    body: `${creatorLabel} поручил вам: «${input.title}»${dueSuffix}. Отметьте «Видел», когда заметите.`,
     url: taskNotificationUrl(input.localePath),
     tag: `task-assigned-${input.title.slice(0, 32)}`,
   });
@@ -92,8 +102,8 @@ export async function notifyTaskCompleted(input: {
   }
 
   await sendPushToUsers([row.createdBy], {
-    title: 'Okhana · Task done',
-    body: `${row.actorLabel} completed the task: «${row.title}»`,
+    title: 'Поручение выполнено',
+    body: `${row.actorLabel} выполнил(а): «${row.title}»`,
     url: taskNotificationUrl(input.localePath),
     tag: `task-done-${input.taskId}`,
   });
@@ -134,8 +144,8 @@ export async function notifyTaskAcknowledged(input: {
   }
 
   await sendPushToUsers([row.createdBy], {
-    title: 'Okhana · Task seen',
-    body: `${row.actorLabel} saw the task: «${row.title}»`,
+    title: 'Поручение просмотрено',
+    body: `${row.actorLabel} увидел(а): «${row.title}»`,
     url: taskNotificationUrl(input.localePath),
     tag: `task-ack-${input.taskId}-${input.acknowledgedByUserId}`,
   });
@@ -149,8 +159,8 @@ export async function notifyTaskPendingSeenReminder(input: {
   localePath?: string;
 }): Promise<void> {
   await sendPushToUsers([input.assigneeUserId], {
-    title: 'Okhana · Please mark seen',
-    body: `You still have an open task: «${input.title}». Tap Mark seen so the family knows you noticed it.`,
+    title: 'Отметьте поручение',
+    body: `Вы ещё не отметили «${input.title}». Нажмите «Видел», чтобы семья знала.`,
     url: taskNotificationUrl(input.localePath),
     tag: `task-pending-seen-${input.taskId}`,
   });
@@ -165,8 +175,8 @@ export async function notifyTaskDueReminder(input: {
   localePath?: string;
 }): Promise<void> {
   await sendPushToUsers([input.assigneeUserId], {
-    title: 'Okhana · Task due',
-    body: `${input.leadPhrase}: «${input.title}». Mark it done when finished.`,
+    title: 'Срок поручения',
+    body: `${input.leadPhrase}: «${input.title}». Отметьте «Сделано», когда выполните.`,
     url: taskNotificationUrl(input.localePath),
     tag: `task-due-${input.taskId}-${input.leadPhrase}`,
   });

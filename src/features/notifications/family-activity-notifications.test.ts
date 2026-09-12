@@ -56,7 +56,7 @@ describe('family activity notifications', () => {
     });
     expect(mockSendPushToUsers).toHaveBeenCalledWith(
       [2, 3],
-      expect.objectContaining({ body: '📅 New event: «Dentist»', tag: 'event-44' }),
+      expect.objectContaining({ body: 'Новое событие: «Dentist»', tag: 'event-44' }),
     );
   });
 
@@ -72,7 +72,7 @@ describe('family activity notifications', () => {
     expect(mockSendPushToUsers).toHaveBeenCalledWith(
       [2],
       expect.objectContaining({
-        body: '📅 You’re included: «Board games»',
+        body: 'Вас добавили к событию «Board games»',
         tag: 'event-45',
       }),
     );
@@ -104,7 +104,7 @@ describe('family activity notifications', () => {
     });
     expect(mockSendPushToUsers).toHaveBeenCalledWith(
       [1],
-      expect.objectContaining({ body: '💝 Wedding', tag: 'date-7' }),
+      expect.objectContaining({ body: 'Добавлена дата: «Wedding»', tag: 'date-7' }),
     );
   });
 
@@ -135,7 +135,7 @@ describe('family activity notifications', () => {
     });
     expect(mockSendPushToUsers).toHaveBeenCalledWith(
       [2],
-      expect.objectContaining({ body: '📝 Budget' }),
+      expect.objectContaining({ body: 'Семья сохранила: «Budget»' }),
     );
   });
 
@@ -155,7 +155,7 @@ describe('family activity notifications', () => {
     });
     expect(mockSendPushToUsers).toHaveBeenCalledWith(
       [3],
-      expect.objectContaining({ body: '📝 Surprise' }),
+      expect.objectContaining({ body: 'Семья сохранила: «Surprise»' }),
     );
   });
 });

@@ -75,8 +75,8 @@ export async function notifyEventCreated(input: {
       return;
     }
     await sendPushToUsers(recipients, {
-      title: 'Okhana · Calendar',
-      body: `📅 You’re included: «${input.eventTitle}»`,
+      title: 'Календарь',
+      body: `Вас добавили к событию «${input.eventTitle}»`,
       url: dashboardNotificationUrl(input.localePath),
       tag: `event-${input.eventId}`,
     });
@@ -86,8 +86,8 @@ export async function notifyEventCreated(input: {
   await notifyFamilyExceptCreator({
     familyId: input.familyId,
     createdBy: input.createdBy,
-    title: 'Okhana · Calendar',
-    body: `📅 New event: «${input.eventTitle}»`,
+    title: 'Календарь',
+    body: `Новое событие: «${input.eventTitle}»`,
     tag: `event-${input.eventId}`,
     localePath: input.localePath,
   });
@@ -104,8 +104,8 @@ export async function notifyMemorableDateCreated(input: {
   await notifyFamilyExceptCreator({
     familyId: input.familyId,
     createdBy: input.createdBy,
-    title: 'Okhana',
-    body: `💝 ${input.dateTitle}`,
+    title: 'Памятная дата',
+    body: `Добавлена дата: «${input.dateTitle}»`,
     tag: `date-${input.dateId}`,
     localePath: input.localePath,
   });
@@ -136,8 +136,8 @@ export async function notifyNoteCreated(input: {
   await notifyFamilyExceptCreator({
     familyId: input.familyId,
     createdBy: input.createdBy,
-    title: 'Okhana',
-    body: `📝 ${input.noteTitle}`,
+    title: 'Новая заметка',
+    body: `Семья сохранила: «${input.noteTitle}»`,
     tag: `note-${input.createdBy}-${input.noteTitle.slice(0, 24)}`,
     localePath: input.localePath,
     recipientFilter: (member) => {
