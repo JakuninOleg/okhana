@@ -69,9 +69,13 @@ export async function runAdvanceNudges(input?: {
     }
 
     for (const nudge of nudges) {
-      const recipientIds = nudge.recipientUserIds?.length
+      let recipientIds = nudge.recipientUserIds?.length
         ? nudge.recipientUserIds
         : familyRecipientIds;
+      if (nudge.excludeUserIds?.length) {
+        const excluded = new Set(nudge.excludeUserIds);
+        recipientIds = recipientIds.filter((id) => !excluded.has(id));
+      }
       if (recipientIds.length === 0) {
         continue;
       }
@@ -84,7 +88,7 @@ export async function runAdvanceNudges(input?: {
         // Claim first (idempotent under concurrent cron), but release if push
         // setup fails so the next daily run can retry this lead window.
         await sendPushToUsers(recipientIds, {
-          title: 'Okhana',
+          title: nudge.title,
           body: nudge.body,
           url: dashboardNotificationUrl(),
           tag: nudge.tag,

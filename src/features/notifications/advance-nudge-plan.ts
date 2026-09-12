@@ -19,11 +19,15 @@ export type PlannedAdvanceNudge = {
   /** Unique per occurrence + lead window — used for DB idempotency. */
   dedupeKey: string;
   tag: string;
+  /** Short lock-screen title (native-app style). */
+  title: string;
   body: string;
   leadDays: AdvanceNudgeLeadDays;
   occurrenceIso: string;
   /** null = whole family; otherwise only these user ids. */
   recipientUserIds: number[] | null;
+  /** Always excluded from recipients (e.g. birthday person). */
+  excludeUserIds?: number[];
 };
 
 function isLeadDay(days: number): days is AdvanceNudgeLeadDays {
@@ -95,8 +99,11 @@ export function planMemberBirthdayNudges(input: {
       occurrenceIso,
       dedupeKey: `member_birthday:${input.userId}:${occurrenceIso}:${days}`,
       tag: `nudge-bday-${input.userId}-${occurrenceIso}-${days}`,
-      body: `🎂 День рождения: ${input.displayName} — ${leadPhraseRu(days)}`,
+      title: 'День рождения',
+      body: `День рождения ${input.displayName} — ${leadPhraseRu(days)}. Не забудьте поздравить.`,
+      // Birthday person must not get “your birthday is coming” family nudges.
       recipientUserIds: null,
+      excludeUserIds: [input.userId],
     },
   ];
 }
@@ -122,7 +129,8 @@ export function planMemorableDateNudges(input: {
       occurrenceIso,
       dedupeKey: `memorable_date:${input.dateId}:${occurrenceIso}:${days}`,
       tag: `nudge-date-${input.dateId}-${occurrenceIso}-${days}`,
-      body: `💝 ${input.title} — ${leadPhraseRu(days)}`,
+      title: 'Памятная дата',
+      body: `${input.title} — ${leadPhraseRu(days)}`,
       recipientUserIds: null,
     },
   ];
@@ -156,7 +164,8 @@ export function planEventNudges(input: {
       occurrenceIso,
       dedupeKey: `event:${input.eventId}:${occurrenceIso}:${days}`,
       tag: `nudge-event-${input.eventId}-${occurrenceIso}-${days}`,
-      body: `📅 ${input.title} — ${leadPhraseRu(days)}`,
+      title: 'Календарь',
+      body: `${input.title} — ${leadPhraseRu(days)}`,
       recipientUserIds: participants.length > 0 ? participants : null,
     },
   ];

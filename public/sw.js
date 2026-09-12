@@ -49,6 +49,8 @@ self.addEventListener('push', (event) => {
       data: { url },
       icon: '/icons/icon-192.png',
       badge: '/icons/icon-192.png',
+      // Re-show same tag with updated copy (native lock-screen feel).
+      renotify: true,
     }),
   );
 });

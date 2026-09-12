@@ -24,8 +24,10 @@ describe('advance-nudge-plan', () => {
       expect.objectContaining({
         kind: 'member_birthday',
         leadDays: 7,
-        body: '🎂 День рождения: Саша — через 7 дней',
+        title: 'День рождения',
+        body: 'День рождения Саша — через 7 дней. Не забудьте поздравить.',
         dedupeKey: 'member_birthday:9:2026-09-14:7',
+        excludeUserIds: [9],
       }),
     ]);
 
@@ -77,8 +79,21 @@ describe('advance-nudge-plan', () => {
       kind: 'memorable_date',
       leadDays: 3,
       dedupeKey: 'memorable_date:44:2026-09-10:3',
-      body: '💝 Годовщина свадьбы — через 3 дня',
+      title: 'Памятная дата',
+      body: 'Годовщина свадьбы — через 3 дня',
     });
+  });
+
+  it('excludes the birthday person from birthday nudge recipients', () => {
+    const planned = planMemberBirthdayNudges({
+      familyId: 1,
+      userId: 9,
+      displayName: 'Саша',
+      birthMonth: 9,
+      birthDay: 14,
+      today,
+    });
+    expect(planned[0]?.excludeUserIds).toEqual([9]);
   });
 
   it('plans events using Moscow offset calendar day', () => {
@@ -96,7 +111,8 @@ describe('advance-nudge-plan', () => {
       kind: 'event',
       leadDays: 3,
       occurrenceIso: '2026-09-10',
-      body: '📅 Врач — через 3 дня',
+      title: 'Календарь',
+      body: 'Врач — через 3 дня',
       recipientUserIds: null,
     });
   });

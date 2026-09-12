@@ -123,7 +123,7 @@ export async function runDailyBriefings(input: {
       )
       .filter((line): line is string => Boolean(line));
 
-    const birthdayLines: string[] = [];
+    const birthdayEntries: Array<{ userId: number; line: string }> = [];
     for (const member of members) {
       if (!member.birthDate) {
         continue;
@@ -139,11 +139,9 @@ export async function runDailyBriefings(input: {
         today,
       });
       if (line) {
-        birthdayLines.push(line);
+        birthdayEntries.push({ userId: member.id, line });
       }
     }
-
-    const sharedDateLines = [...memorableLines, ...birthdayLines];
 
     for (const member of members) {
       membersScanned += 1;
@@ -157,11 +155,16 @@ export async function runDailyBriefings(input: {
         .filter((task) => task.myAssignment !== null)
         .map((task) => task.title);
 
+      // Never remind someone about their own birthday in the daily briefing.
+      const birthdayLines = birthdayEntries
+        .filter((entry) => entry.userId !== member.id)
+        .map((entry) => entry.line);
+
       const content = buildBriefingPushContent({
         slot: input.slot,
         openTaskTitles,
         eventLines,
-        dateLines: sharedDateLines,
+        dateLines: [...memorableLines, ...birthdayLines],
       });
 
       if (!content) {
