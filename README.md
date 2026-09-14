@@ -1,7 +1,7 @@
 # Okhana
 
 > **AI is the architecture, not a feature.**  
-> An AI-powered family hub — where every interaction is stored, searchable, and private by design.
+> A family hub where Okhana (the home AI) remembers shared context, coordinates members, and executes actions — with privacy enforced in the database, not in the prompt.
 
 [![CI](https://github.com/JakuninOleg/okhana/actions/workflows/ci.yml/badge.svg)](https://github.com/JakuninOleg/okhana/actions/workflows/ci.yml)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript)
@@ -12,284 +12,221 @@
 
 ---
 
-## Problem
+## What it is
 
-Families juggle an enormous mental load. Where is the passport? When is the dentist appointment? What was the WiFi password Grandma asked for? Who needs to be picked up from school today?
+Families carry a huge mental load: where documents live, who must do what by when, birthdays, appointments, “surprises” that some members must not see.
 
-Existing tools are either:
+Okhana is a **shared family space** plus an **agentic chat**:
 
-- **Synchronous** (group chats, shared calendars) — they work *now*, but information disappears in endless scrolling.
-- **Static** (shared docs, notes) — durable but unstructured, require manual organisation, and don't answer questions.
-- **Corporate** (Notion, Trello) — built for workplaces, not for a parent managing bedtime, soccer practice, and a visa application at the same time.
+- Durable knowledge (**notes**) with role- and person-level visibility
+- Actionable work (**tasks / поручения**) with seen / done and push reminders
+- **Calendar** events and recurring **memorable dates**
+- An AI assistant that **creates and manages** those objects through tools — scoped to what the signed-in member is allowed to see
 
-**Okhana** is a family operating system that combines durable storage with conversational AI — it remembers everything, answers anything, and keeps it private within your family.
+Core principle: *privacy filtering happens at the query level before any data reaches the model.*
+
+---
+
+## What’s shipped today
+
+| Area | Status |
+|---|---|
+| Family create / join by invite code / roles (owner · adult · child) | ✅ |
+| Member profiles, kinship labels (viewer-specific), leave / invite rotate | ✅ |
+| Notes: create (chat), search, edit, privacy + `hiddenFrom`, delete via chat | ✅ |
+| Tasks: create / list / update / cancel / mark seen / mark done (UI + chat) | ✅ |
+| Calendar events (incl. addressed participants) | ✅ |
+| Memorable dates + profile birthday nudges | ✅ |
+| AI chat (Go-Ai gateway): streaming, tool calling, voice in / TTS (EN) | ✅ |
+| Soft-launch chat quotas (per family / per user, Moscow day) | ✅ |
+| PWA shell + Web Push (tasks, calendar, birthdays, daily briefings) | ✅ |
+| i18n (`en` / `ru`), light/dark theme | ✅ |
+| Marketing landing + Vercel Preview deploys per PR | ✅ |
+
+### AI tools (in-app execution)
+
+Notes: `remember_note`, `search_notes`, `update_note`, `update_note_privacy`, `delete_note`  
+Tasks: `create_task`, `list_tasks`, `update_task`, `cancel_task`, `acknowledge_task`, `complete_task`  
+Calendar / dates: `create_event`, `list_events`, `create_memorable_date`, `list_memorable_dates`
+
+### Notifications (Web Push)
+
+Native-style Russian lock-screen copy for new / seen / done tasks, calendar, notes, birthdays, and morning/evening briefings. Profile-birthday advance nudges and briefing lines **exclude the birthday person**. Cron-backed reminders for “mark seen” and approaching due dates.
 
 ---
 
 ## Differentiation
 
-| Feature | Okhana | Cozi | FamilyHub | Ohai | Kora |
-|---|---|---|---|---|---|
-| **AI-native search** | ✅ DB-level RAG | ❌ | ❌ | ❌ | ❌ |
-| **Role-based ACL** | ✅ Owner / Adult / Child | ❌ | ❌ | ❌ | ✅ |
-| **End-to-end encryption** | ✅ Encrypted notes | ❌ | ❌ | ❌ | ❌ |
-| **Multi-language** | ✅ i18n (ru/en) | ❌ | ❌ | ❌ | ❌ |
-| **Open-source** | ✅ MIT | ❌ | ❌ | ❌ | ❌ |
-| **Privacy-first AI** | ✅ Row-level filtering | ❌ | ❌ | ✅ | ❌ |
+| Capability | Okhana | Typical family calendar apps |
+|---|---|---|
+| AI as orchestrator (tool-calling, not a bolt-on chat widget) | ✅ | Usually ❌ |
+| Role-based + per-user note ACL | ✅ | Rare |
+| Privacy at DB query time (model never sees forbidden rows) | ✅ | Prompt-only or none |
+| Tasks with ack / done + push | ✅ | Partial |
+| i18n (`ru` / `en`) | ✅ | Rare |
+| Open source (MIT) | ✅ | ❌ |
+
+**Not claimed (yet):** end-to-end encryption of note bodies, vector RAG / embeddings (search today is permission-filtered `ILIKE`), third-party maps.
+
+---
+
+## Privacy-first design
+
+> We do not rely on “the model won’t tell.”
+
+1. Member asks a question or triggers a tool.
+2. Drizzle queries apply family tenancy + note visibility (`privacy_level`, `hidden_from`, role).
+3. Only permitted rows reach the model / tool results.
+4. Chat history is per-user; soft-deleted messages stay out of history reload.
+
+Postgres **RLS is not enabled yet** — tenancy is enforced in application queries. See `.env.example`.
 
 ---
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                    Next.js 16 App Router              │
-│  ┌──────────┐  ┌──────────┐  ┌──────────────────┐  │
-│  │ Clerk    │  │ next-intl│  │ Vercel AI SDK    │  │
-│  │ Auth     │  │ i18n     │  │ Streaming / RAG  │  │
-│  └────┬─────┘  └────┬─────┘  └────────┬─────────┘  │
-│       │             │                  │            │
-│       ▼             ▼                  ▼            │
-│  ┌─────────────────────────────────────────────┐   │
-│  │          Next.js API / Server Actions       │   │
-│  └──────────────────┬──────────────────────────┘   │
-│                     │                              │
-└─────────────────────┼──────────────────────────────┘
-                      │
-         ┌────────────┴────────────┐
-         ▼                         ▼
-   ┌──────────┐             ┌──────────────┐
-   │ Drizzle  │             │  Drizzle ORM │
-   │ ORM      │◄────────────►  Migrations  │
-   └────┬─────┘             └──────────────┘
-        │
-        ▼
-   ┌──────────────┐
-   │  Supabase    │
-   │  PostgreSQL  │
-   └──────────────┘
+┌──────────────────────────────────────────────────────────┐
+│                 Next.js 16 App Router                    │
+│  Clerk auth · next-intl · PWA / service worker           │
+│  features/* (family, notes, tasks, calendar, chat, AI)   │
+│  API: /api/chat · /api/push · /api/cron · webhooks       │
+└───────────────┬───────────────────────────┬──────────────┘
+                │                           │
+                ▼                           ▼
+        Drizzle + Postgres            Go-Ai gateway
+        (Supabase project             (chat / tools /
+         `okhana`, shared)             voice / TTS)
 ```
 
----
-
-## Core Features (MVP)
-
-### 1. Family Creation & Roles
-- A user creates a family and becomes **owner**.
-- Invite members via a unique code — assign roles: **adult** or **child**.
-
-### 2. Shared Memory with ACL
-- Notes are the core knowledge base: documents, reminders, medical records, financial info.
-- Each note has a privacy level: `public` → `adults_only` → `personal` (encrypted).
-- Hidden-from lists allow fine-grained exclusions per note.
-
-### 3. AI Chat with DB-Level Privacy
-- Chat with an assistant that can retrieve and summarise family notes.
-- **Crucially**: the AI only ever receives data the user already has DB-access to. We never rely on prompt engineering alone.
-
-### 4. Calendar
-- Simplified family calendar with events, tags, and all-day support.
-
-### 5. Agentic Scenarios (coming)
-- "Has anyone seen my passport?" → searches encrypted notes + suggests probable locations.
-- "Prepare a packing list for Italy" → combines calendar + weather + stored documents.
+Local, Vercel Preview, and Production all use the **same** Supabase project. Treat migrations and manual SQL as production operations.
 
 ---
 
-## Privacy-First Design
+## Tech stack
 
-> **"We do not rely on 'the model won't tell.'"**
-
-Privacy filtering happens at the **database query level**, not in the LLM prompt:
-
-1. User asks a question.
-2. Query builder enforces row-level security based on the user's role and the note's `privacy_level` + `hidden_from`.
-3. Only the permitted results are passed as context to the AI model.
-4. The model never sees data it shouldn't.
-
----
-
-## Tech Stack
-
-| Layer | Technology | Purpose |
-|---|---|---|
-| **Framework** | Next.js 16.2.10 (App Router) | Full-stack React framework |
-| **UI** | React 19.2.4 | Component library |
-| **Language** | TypeScript 5 (strict) | Type safety |
-| **Styling** | Tailwind CSS v4 + shadcn/ui | Utility-first design system |
-| **Auth** | Clerk | Authentication & user management |
-| **i18n** | next-intl 4.13.2 | Internationalisation (ru/en) |
-| **Database** | Supabase PostgreSQL + Drizzle ORM | Persistence & type-safe queries |
-| **AI** | Vercel AI SDK | Streaming chat & RAG |
-| **Maps** | Yandex Maps API | Location services |
-| **Testing** | Vitest | Unit & integration tests |
-| **CI/CD** | GitHub Actions → Vercel | Continuous deployment |
+| Layer | Technology |
+|---|---|
+| Framework | Next.js 16.2.10 (App Router) |
+| UI | React 19.2.4 · Tailwind CSS v4 · shadcn/ui |
+| Language | TypeScript 5 (strict) |
+| Auth | Clerk |
+| i18n | next-intl 4.13.2 (`ru` / `en`) |
+| Database | Supabase PostgreSQL · Drizzle ORM |
+| AI | Go-Ai OpenAI-compatible gateway (server-only) |
+| Push | Web Push (`web-push` + VAPID) |
+| Testing | Vitest |
+| CI/CD | GitHub Actions → Vercel |
 
 ---
 
-## Project Structure
+## Project structure
 
 ```
 okhana/
-├── .github/workflows/
-│   └── ci.yml                  # Lint + typecheck + tests
-├── messages/
-│   ├── en.json                 # English strings
-│   └── ru.json                 # Russian strings
+├── messages/                 # en.json · ru.json
+├── drizzle/                  # SQL migrations (0000…0008+)
+├── public/sw.js              # PWA shell + push handler
 ├── src/
 │   ├── app/
-│   │   ├── [locale]/           # i18n-routed pages
-│   │   │   ├── (auth)/
-│   │   │   │   ├── sign-in/
-│   │   │   │   └── sign-up/
-│   │   │   ├── layout.tsx
-│   │   │   └── page.tsx
-│   │   ├── api/
-│   │   │   └── webhooks/clerk/ # Clerk user sync
-│   │   └── globals.css
-│   ├── components/
-│   │   └── ui/                 # shadcn/ui primitives
-│   ├── i18n/                   # next-intl config
-│   ├── lib/
-│   │   ├── server/db/
-│   │   │   ├── schema.ts       # 6 tables, 4 enums
-│   │   │   ├── index.ts        # DB client
-│   │   │   └── queries/        # Domain query modules
-│   │   └── utils.ts            # cn() helper
-│   └── proxy.ts                # Clerk + next-intl middleware
-├── drizzle/                    # SQL migration files
-│   ├── drizzle.config.ts
-│   └── 0000_keen_diamondback.sql
-├── vitest.config.ts
+│   │   ├── [locale]/        # marketing · dashboard · Clerk auth
+│   │   └── api/
+│   │       ├── chat/         # stream · history · speech · transcribe
+│   │       ├── cron/         # advance-nudges · daily-briefing
+│   │       ├── push/         # VAPID subscribe
+│   │       ├── tasks/events  # SSE for live task strip
+│   │       └── webhooks/clerk/
+│   ├── features/             # domain modules (preferred home for product code)
+│   │   ├── ai/ · chat/ · family/ · notes/ · tasks/
+│   │   ├── calendar/ · notifications/ · marketing/
+│   ├── components/ui/        # shadcn primitives
+│   ├── i18n/
+│   ├── lib/server/db/        # schema · client · quotas
+│   └── proxy.ts              # Clerk + next-intl edge entry
+├── AGENTS.md                 # engineering standards for humans + AI agents
 └── package.json
 ```
 
 ---
 
-## Getting Started
+## Getting started
 
 ```bash
-# Clone the repository
 git clone https://github.com/JakuninOleg/okhana.git
 cd okhana
-
-# Install dependencies
 npm install
-
-# Configure environment
-cp .env.example .env.local
-# Fill in the required values (see below)
-
-# Push database schema
-npm run db:push
-
-# Start development server
-npm run dev
+cp .env.example .env.local   # fill secrets (see below)
+npm run db:migrate           # prefer migrate over push on the shared DB
+npm run dev                  # webpack; use npm run dev:turbo if you want Turbopack
 ```
 
-### Required Environment Variables
+Open [http://localhost:3000](http://localhost:3000).
 
-All deploy targets share the **same Supabase `okhana` project** (no dev database).
+### Environment variables
 
-| Variable | Description |
+Documented in [`.env.example`](./.env.example). Highlights:
+
+| Variable | Role |
 |---|---|
-| `DATABASE_URL` | Supabase transaction pooler (`:6543`). Runtime queries from Next.js |
-| `DIRECT_URL` | Session/direct Postgres URL (`:5432`). **Migrations only** (`drizzle-kit`) — do not point the app at this or you will hit `EMAXCONNSESSION` (pool ~15) |
-| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk publishable key |
-| `CLERK_SECRET_KEY` | Clerk secret key |
-| `CLERK_WEBHOOK_SECRET` | Clerk webhook signing secret |
-| `GO_AI_BASE_URL` | Go-Ai gateway base URL (server-only) |
-| `GO_AI_SHARED_SECRET` | Go-Ai bearer secret (server-only, never `NEXT_PUBLIC_*`) |
-| `AI_CHAT_DAILY_FAMILY_LIMIT` | Optional. Soft-launch family chat ceiling per Moscow day (default **150**) |
-| `AI_CHAT_DAILY_USER_LIMIT` | Optional. Soft-launch per-user chat ceiling per Moscow day (default **80**) |
-| `AI_CHAT_DISABLED` | Optional. `true` pauses all chat (kill-switch) |
+| `DATABASE_URL` | Pooler `:6543` — app runtime |
+| `DIRECT_URL` | Session `:5432` — migrations only |
+| `NEXT_PUBLIC_CLERK_*` / `CLERK_*` | Auth + webhooks |
+| `GO_AI_BASE_URL` / `GO_AI_SHARED_SECRET` | AI gateway (never `NEXT_PUBLIC_*`) |
+| `VAPID_*` | Web Push |
+| `CRON_SECRET` | Bearer auth for `/api/cron/*` |
+| `AI_CHAT_DAILY_FAMILY_LIMIT` / `AI_CHAT_DAILY_USER_LIMIT` | Optional chat ceilings (defaults 150 / 80, Moscow day) |
+| `AI_CHAT_DISABLED` | Optional kill-switch |
 
-Set the same `DATABASE_URL` / `DIRECT_URL` in Vercel for **Preview** and **Production**.
-Use Clerk Development keys on Preview; Production keys on `main` only.
+**Clerk:** Development keys (`pk_test_` / `sk_test_`) on localhost and Vercel Preview; Production keys (`pk_live_` / `sk_live_`) only on `okhanahome.com`. Webhooks do not reach localhost.
 
-### Clerk: Development vs Production Keys
-
-Clerk requires **two separate key pairs**, and they are not interchangeable:
-
-| Environment | Key prefix | Where it works |
-|---|---|---|
-| **Development** | `pk_test_` / `sk_test_` | `localhost` only — used for local dev |
-| **Production** | `pk_live_` / `sk_live_` | `okhanahome.com` only — enforces origin validation, requires HTTPS |
-
-Production keys **will not work on `localhost`** — Clerk validates the request origin against the configured production domain. Use development keys locally, production keys in Vercel **Production** only, and development keys on Vercel **Preview** (PR deploys).
-
-The production instance is configured with a custom domain — **okhanahome.com** — purchased specifically to support Clerk's production requirements (Clerk needs a domain you control to add its verification/session DNS records; a `*.vercel.app` domain doesn't support this).
-
-### Database safety (single `okhana` project)
-
-Because local and Preview use the **production database**, treat schema changes as production operations:
-
-- Run `npm run db:generate` locally, review SQL in `drizzle/`, then `npm run db:migrate` deliberately.
-- Avoid `db:push` against shared data unless you know the diff is safe.
-- Do not seed or delete rows casually on localhost — it affects real families.
+**Database safety:** one shared `okhana` project. Review `drizzle/` carefully; do not casually seed or wipe local data.
 
 ---
 
-## Testing
+## Scripts
 
 ```bash
-# Run all tests (CI mode)
-npm run test
-
-# Run tests in watch mode
-npm run test:watch
-
-# TypeScript check
-npm run build       # includes tsc --noEmit
-
-# Lint
-npm run lint
+npm run dev          # local app
+npm run build        # production build + typecheck
+npm run test         # Vitest
+npm run lint         # ESLint
+npm run db:generate  # drizzle-kit generate (from .env.local)
+npm run db:migrate   # apply migrations
+npm run db:check-env # sanity-check DB URLs
 ```
 
 ---
 
-## CI/CD Pipeline
+## CI/CD
 
-Every pull request to `master` triggers a GitHub Actions workflow:
+Every PR to `master` runs GitHub Actions: `npm ci` → lint → `tsc --noEmit` → Vitest.
 
-1. **Checkout** — fetch code
-2. **Setup Node.js 20** — with npm cache
-3. `npm ci` — clean install from lockfile
-4. `npm run lint` — ESLint (0 warnings required)
-5. `npx tsc --noEmit` — TypeScript strict check
-6. `npm run test` — Vitest (all green)
+Merge to `master` deploys Production on Vercel. Each PR gets a Preview deploy (Clerk Development + same database).
 
-On merge to `master`, Vercel automatically deploys the production build.
+Branching: `feature/*` or `fix/*` from `master` → PR → merge. Do not commit to `master` directly. The `staging` branch is deprecated.
 
 ---
 
-## Roadmap
+## Roadmap (near-term)
 
-| Status | Feature |
+| Priority | Item |
 |---|---|
-| ✅ | Internationalisation (ru/en) |
-| ✅ | Theme (light/dark with shadcn/ui) |
-| ✅ | Clerk authentication & webhook sync |
-| ✅ | Database schema (6 tables, 4 enums) |
-| ✅ | CI baseline (lint + typecheck + tests) |
-| 🔄 | Family creation UI & invite flow |
-| ⏳ | Notes CRUD endpoint |
-| ⏳ | AI chat with RAG |
-| ⏳ | First agentic scenario |
-| 🔮 | Property tracking module |
-| 🔮 | Gamification for children |
-| 🔮 | Family ownership transfer |
+| Next | Richer note search (FTS → optional hybrid / embeddings) without weakening ACL |
+| Next | Quiet hours / per-member notification preferences |
+| Later | Postgres RLS as defense-in-depth |
+| Later | Billing / plans |
+| Later | Legal / privacy pages for public launch channels |
+| Later | More agentic scenarios (packing lists, multi-step household flows) |
 
 ---
 
 ## Contributing
 
-1. Fork the repository.
-2. Create a feature branch: `feature/description` or `fix/description`.
-3. Follow the guidelines in [`AGENTS.md`](./AGENTS.md).
-4. Make atomic commits (one logical change per commit).
-5. Ensure `npm run build` and `npm run test` pass.
-6. Open a pull request.
+1. Branch from `master`: `feature/…` or `fix/…`.
+2. Follow [`AGENTS.md`](./AGENTS.md) (TypeScript strict, Server Components by default, i18n for all UI strings, no secrets in git).
+3. Conventional, atomic commits.
+4. Before PR: eslint on touched files, tests green, `npm run build` clean; use Bugbot / Security Review when shipping product or auth/push/ACL changes.
+5. Open a PR — never merge your own without review when policy requires it.
 
 ---
 
